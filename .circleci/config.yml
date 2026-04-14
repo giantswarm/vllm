@@ -1,0 +1,21 @@
+version: 2.1
+
+orbs:
+  architect: giantswarm/architect@6.15.0
+
+workflows:
+  build:
+    jobs:
+      # Tag builds: ARM64 only (target is DGX Spark with Blackwell GPUs).
+      # The Dockerfile downloads prebuilt wheels -- no GPU needed at build time.
+      - architect/push-to-registries-multiarch:
+          context: architect
+          name: push-to-registries-release
+          image: giantswarm/vllm
+          platforms: "linux/arm64"
+          force-public: true
+          filters:
+            tags:
+              only: /^v.*/
+            branches:
+              ignore: /.*/

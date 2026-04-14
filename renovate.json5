@@ -1,0 +1,12 @@
+{
+  "extends": [
+    "github>giantswarm/renovate-presets:default.json5",
+  ],
+  "packageRules": [
+    {
+      "description": "Group CUDA base image updates",
+      "matchPackageNames": ["nvidia/cuda"],
+      "groupName": "cuda",
+    },
+  ],
+}
