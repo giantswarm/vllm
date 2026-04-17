@@ -23,7 +23,7 @@ WORKDIR /workspace/vllm
 # Upgrade PyTorch to nightly (eugr wheels are compiled against nightly APIs)
 # while keeping NGC's Triton which has the tested MLA kernel.
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv pip install torch torchvision torchaudio \
+    uv pip install --reinstall torch torchvision torchaudio \
       --index-url https://download.pytorch.org/whl/nightly/cu130
 
 # Download prebuilt wheels from eugr/spark-vllm-docker GitHub releases.
