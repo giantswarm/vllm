@@ -1,35 +1,23 @@
 # vLLM image for DGX Spark (ARM64, Blackwell sm_121, 128GB unified memory)
 #
-# Uses the same CUDA 13.2 + PyTorch nightly base as eugr/spark-vllm-docker
-# (which builds the prebuilt wheels). The wheels are compiled against CUDA 13.2
-# and PyTorch nightly from the cu130 index, so the runtime must match.
+# Based on NVIDIA's PyTorch container which ships a tested Triton, cuDNN, NCCL,
+# and TransformerEngine stack for sm_121 (Blackwell). This avoids the Triton
+# version mismatch that occurs when assembling PyTorch from nightly cu130 wheels.
 #
 # Prebuilt wheels source: https://github.com/eugr/spark-vllm-docker/releases
-# The workflow runs on a weekly schedule to pick up newer base images and wheels.
 
-# renovate: datasource=docker depName=nvidia/cuda
-FROM nvidia/cuda:13.2.0-devel-ubuntu24.04
+# renovate: datasource=docker depName=nvcr.io/nvidia/pytorch
+FROM nvcr.io/nvidia/pytorch:26.03-py3
 
-ENV DEBIAN_FRONTEND=noninteractive
-ENV PIP_BREAK_SYSTEM_PACKAGES=1
 ENV UV_SYSTEM_PYTHON=1
 ENV UV_BREAK_SYSTEM_PACKAGES=1
 ENV UV_LINK_MODE=copy
 ENV UV_HTTP_TIMEOUT=600
 
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-      python3 python3-pip python3-dev curl git wget \
-      libcudnn9-cuda-13 libibverbs1 && \
-    rm -rf /var/lib/apt/lists/* && \
-    pip install uv
+RUN pip install uv && \
+    pip uninstall -y flash-attn
 
 WORKDIR /workspace/vllm
-
-# Install PyTorch from the same nightly cu130 index used by eugr's wheel builds.
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv pip install torch torchvision torchaudio triton \
-      --index-url https://download.pytorch.org/whl/nightly/cu130
 
 # Download prebuilt wheels from eugr/spark-vllm-docker GitHub releases.
 # The release tags are rolling (updated nightly with tested builds).
