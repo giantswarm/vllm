@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-04-17
+
+### Changed
+
+- Revert base image from `nvidia/cuda:13.2.0-devel-ubuntu24.04` to `nvcr.io/nvidia/pytorch:26.03-py3` to fix TRITON_MLA kernel crash caused by Triton version mismatch.
+- Remove manual PyTorch/Triton nightly installation (pre-installed in NGC container).
+- Remove redundant apt-get dependencies (included in NGC container).
+- Uninstall flash-attn from NGC base to avoid conflict with FlashInfer.
+- Update Renovate config to track `nvcr.io/nvidia/pytorch` instead of `nvidia/cuda`.
+
 ## [0.1.0] - 2026-04-14
 
 ### Added

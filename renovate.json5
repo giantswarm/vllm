@@ -4,9 +4,9 @@
   ],
   "packageRules": [
     {
-      "description": "Group CUDA base image updates",
-      "matchPackageNames": ["nvidia/cuda"],
-      "groupName": "cuda",
+      "description": "Group PyTorch base image updates",
+      "matchPackageNames": ["nvcr.io/nvidia/pytorch"],
+      "groupName": "pytorch",
     },
   ],
 }
