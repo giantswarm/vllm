@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Upgrade PyTorch to nightly on top of NGC base to fix ABI mismatch with eugr wheels (`register_opaque_type(hoist=True)` not available in NGC's PyTorch 2.11 stable). NGC's Triton is preserved to keep the TRITON_MLA fix.
+- Force reinstall torch/torchvision/torchaudio with `--reinstall` flag so uv replaces NGC's stable PyTorch instead of skipping the upgrade.
 
 ## [0.2.0] - 2026-04-17
 
