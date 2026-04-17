@@ -1,8 +1,9 @@
 # vLLM image for DGX Spark (ARM64, Blackwell sm_121, 128GB unified memory)
 #
-# Based on NVIDIA's PyTorch container which ships a tested Triton, cuDNN, NCCL,
-# and TransformerEngine stack for sm_121 (Blackwell). This avoids the Triton
-# version mismatch that occurs when assembling PyTorch from nightly cu130 wheels.
+# Based on NVIDIA's PyTorch container for its tested Triton, cuDNN, NCCL, and
+# TransformerEngine stack (fixes the TRITON_MLA kernel crash seen with nightly
+# Triton). PyTorch itself is upgraded to nightly to match the ABI expected by
+# the eugr prebuilt vLLM/FlashInfer wheels.
 #
 # Prebuilt wheels source: https://github.com/eugr/spark-vllm-docker/releases
 
@@ -18,6 +19,12 @@ RUN pip install uv && \
     pip uninstall -y flash-attn
 
 WORKDIR /workspace/vllm
+
+# Upgrade PyTorch to nightly (eugr wheels are compiled against nightly APIs)
+# while keeping NGC's Triton which has the tested MLA kernel.
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install torch torchvision torchaudio \
+      --index-url https://download.pytorch.org/whl/nightly/cu130
 
 # Download prebuilt wheels from eugr/spark-vllm-docker GitHub releases.
 # The release tags are rolling (updated nightly with tested builds).
