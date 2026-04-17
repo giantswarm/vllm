@@ -24,10 +24,26 @@ WORKDIR /workspace/vllm
 # The eugr vLLM wheels are compiled against standard PyTorch 2.11.0, whose
 # C++ ABI differs from NGC's fork (missing register_opaque_type hoist param,
 # different symbol exports for at::cuda functions).
+# NGC's patched Triton is preserved because it contains the TRITON_MLA kernel
+# fix for MLA attention (FLASHINFER does not support MLA on this architecture).
+RUN cp -a /usr/local/lib/python3.12/dist-packages/triton /tmp/ngc-triton && \
+    cp -a /usr/local/lib/python3.12/dist-packages/triton_helpers /tmp/ngc-triton_helpers 2>/dev/null || true && \
+    cp -a /usr/local/lib/python3.12/dist-packages/triton_kernels /tmp/ngc-triton_kernels 2>/dev/null || true
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip install --reinstall \
       "torch==2.11.0" torchvision torchaudio \
       --index-url https://download.pytorch.org/whl/cu130
+RUN rm -rf /usr/local/lib/python3.12/dist-packages/triton && \
+    cp -a /tmp/ngc-triton /usr/local/lib/python3.12/dist-packages/triton && \
+    if [ -d /tmp/ngc-triton_helpers ]; then \
+      rm -rf /usr/local/lib/python3.12/dist-packages/triton_helpers && \
+      cp -a /tmp/ngc-triton_helpers /usr/local/lib/python3.12/dist-packages/triton_helpers; \
+    fi && \
+    if [ -d /tmp/ngc-triton_kernels ]; then \
+      rm -rf /usr/local/lib/python3.12/dist-packages/triton_kernels && \
+      cp -a /tmp/ngc-triton_kernels /usr/local/lib/python3.12/dist-packages/triton_kernels; \
+    fi && \
+    rm -rf /tmp/ngc-triton /tmp/ngc-triton_helpers /tmp/ngc-triton_kernels
 
 # Download prebuilt wheels from eugr/spark-vllm-docker GitHub releases.
 # The release tags are rolling (updated nightly with tested builds).
