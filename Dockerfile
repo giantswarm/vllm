@@ -20,15 +20,14 @@ RUN pip install uv && \
 
 WORKDIR /workspace/vllm
 
-# Upgrade PyTorch to the nightly matching the eugr wheel build date.
-# The eugr wheels embed the date in their version (d20260416), and we must
-# use the same nightly to avoid C++ ABI mismatches in vllm._C.
+# Replace NGC's patched PyTorch with the standard 2.11.0 from pytorch.org.
+# The eugr vLLM wheels are compiled against standard PyTorch 2.11.0, whose
+# C++ ABI differs from NGC's fork (missing register_opaque_type hoist param,
+# different symbol exports for at::cuda functions).
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip install --reinstall \
-      "torch==2.13.0.dev20260416+cu130" \
-      "torchvision==0.27.0.dev20260416+cu130" \
-      "torchaudio==2.11.0.dev20260416+cu130" \
-      --index-url https://download.pytorch.org/whl/nightly/cu130
+      "torch==2.11.0" torchvision torchaudio \
+      --index-url https://download.pytorch.org/whl/cu130
 
 # Download prebuilt wheels from eugr/spark-vllm-docker GitHub releases.
 # The release tags are rolling (updated nightly with tested builds).
