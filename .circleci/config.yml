@@ -25,10 +25,10 @@ jobs:
     resource_class: small
     shell: /bin/bash
     parameters:
-      upstream:
+      source_image:
         description: Upstream image name under ghcr.io/spark-arena/.
         type: string
-      prefix:
+      tag_prefix:
         description: Destination tag prefix on gsoci (e.g. eugr, eugr-tf5).
         type: string
       source_tag:
@@ -65,14 +65,14 @@ jobs:
               --password "${ACR_GSOCI_PASSWORD}" \
               gsoci.azurecr.io
       - run:
-          name: Mirror << parameters.upstream >> -> gsoci/vllm:<< parameters.prefix >>-*
+          name: Mirror << parameters.source_image >> -> gsoci/vllm:<< parameters.tag_prefix >>-*
           no_output_timeout: 30m
           command: |
             set -euo pipefail
 
-            SOURCE_REPO="ghcr.io/spark-arena/<< parameters.upstream >>"
+            SOURCE_REPO="ghcr.io/spark-arena/<< parameters.source_image >>"
             DEST_REPO="gsoci.azurecr.io/giantswarm/vllm"
-            PREFIX="<< parameters.prefix >>"
+            PREFIX="<< parameters.tag_prefix >>"
             INPUT_TAG="<< parameters.source_tag >>"
 
             DIGEST=$(skopeo inspect --no-tags --format '{{.Digest}}' \
@@ -165,10 +165,10 @@ workflows:
       - mirror-spark-arena:
           context: architect
           name: mirror-eugr
-          upstream: dgx-vllm-eugr-nightly
-          prefix: eugr
+          source_image: dgx-vllm-eugr-nightly
+          tag_prefix: eugr
       - mirror-spark-arena:
           context: architect
           name: mirror-eugr-tf5
-          upstream: dgx-vllm-eugr-nightly-tf5
-          prefix: eugr-tf5
+          source_image: dgx-vllm-eugr-nightly-tf5
+          tag_prefix: eugr-tf5
