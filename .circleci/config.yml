@@ -3,6 +3,134 @@ version: 2.1
 orbs:
   architect: giantswarm/architect@6.15.0
 
+jobs:
+  # Mirror spark-arena dgx-vllm-eugr-nightly[-tf5] to gsoci.
+  #
+  # Why: The DGX Spark "spark-arena" recipe-registry pulls
+  # ghcr.io/spark-arena/dgx-vllm-eugr-nightly[-tf5]:latest. Those images bake in
+  # tool-call / reasoning parsers (glm47, gemma4, minimax_m2, qwen3,
+  # qwen3_coder, super_v3), fastsafetensors, --kv-cache-dtype fp8 wiring and a
+  # few eugr-only CLI flags that the recipes depend on. Re-tagging upstream
+  # digests onto our own gsoci repo keeps the air-gapped cluster pulling from
+  # gsoci while staying byte-identical with whatever spark-arena tested last
+  # night.
+  #
+  # Tag scheme on gsoci.azurecr.io/giantswarm/vllm:
+  #   eugr-<YYYYMMDDNN>           - non-tf5 variant, pinned to upstream date-rev
+  #   eugr-tf5-<YYYYMMDDNN>       - tf5 variant, pinned to upstream date-rev
+  #   eugr-latest, eugr-tf5-latest - moving alias, retagged each successful run
+  mirror-spark-arena:
+    docker:
+      - image: gsoci.azurecr.io/giantswarm/skopeo:v1.19.0
+    resource_class: small
+    shell: /bin/bash
+    parameters:
+      source_image:
+        description: Upstream image name under ghcr.io/spark-arena/.
+        type: string
+      tag_prefix:
+        description: Destination tag prefix on gsoci (e.g. eugr, eugr-tf5).
+        type: string
+      source_tag:
+        description: Upstream tag to mirror (date-rev like 2026041801, or "latest").
+        type: string
+        default: "latest"
+    steps:
+      - run:
+          name: Install jq
+          command: |
+            set -euo pipefail
+            if command -v jq >/dev/null 2>&1; then
+              exit 0
+            fi
+            if command -v apk >/dev/null 2>&1; then
+              apk add --no-cache jq
+            elif command -v dnf >/dev/null 2>&1; then
+              dnf install -y --setopt=install_weak_deps=False jq
+            elif command -v microdnf >/dev/null 2>&1; then
+              microdnf install -y jq
+            elif command -v apt-get >/dev/null 2>&1; then
+              apt-get update
+              apt-get install -y --no-install-recommends jq
+            else
+              echo "no supported package manager found in base image" >&2
+              exit 1
+            fi
+      - run:
+          name: Login to gsoci.azurecr.io
+          command: |
+            set -euo pipefail
+            skopeo login \
+              --username "${ACR_GSOCI_USERNAME}" \
+              --password "${ACR_GSOCI_PASSWORD}" \
+              gsoci.azurecr.io
+      - run:
+          name: Mirror << parameters.source_image >> -> gsoci/vllm:<< parameters.tag_prefix >>-*
+          no_output_timeout: 30m
+          command: |
+            set -euo pipefail
+
+            SOURCE_REPO="ghcr.io/spark-arena/<< parameters.source_image >>"
+            DEST_REPO="gsoci.azurecr.io/giantswarm/vllm"
+            PREFIX="<< parameters.tag_prefix >>"
+            INPUT_TAG="<< parameters.source_tag >>"
+
+            DIGEST=$(skopeo inspect --no-tags --format '{{.Digest}}' \
+              "docker://${SOURCE_REPO}:${INPUT_TAG}")
+            echo "Source ${SOURCE_REPO}:${INPUT_TAG} digest: ${DIGEST}"
+
+            DATE_TAG=""
+            if [[ "${INPUT_TAG}" =~ ^[0-9]{8,10}$ ]]; then
+              DATE_TAG="${INPUT_TAG}"
+            else
+              # Walk recent date-revision tags (YYYYMMDDNN) to find the one
+              # that points at the same digest. Mirroring an upstream-faithful
+              # tag (e.g. eugr-2026041801) instead of synthesising our own
+              # date keeps the mapping reproducible.
+              for cand in $(skopeo list-tags "docker://${SOURCE_REPO}" \
+                            | jq -r '.Tags[]' \
+                            | grep -E '^[0-9]{10}$' \
+                            | sort -ru | head -20); do
+                CDIG=$(skopeo inspect --no-tags --format '{{.Digest}}' \
+                  "docker://${SOURCE_REPO}:${cand}" 2>/dev/null || echo "")
+                if [ "${CDIG}" = "${DIGEST}" ]; then
+                  DATE_TAG="${cand}"
+                  break
+                fi
+              done
+            fi
+
+            if [ -z "${DATE_TAG}" ]; then
+              echo "ERROR: could not resolve a date-rev tag for digest ${DIGEST}" >&2
+              exit 1
+            fi
+            echo "Resolved date-rev tag: ${DATE_TAG}"
+
+            PINNED_TAG="${PREFIX}-${DATE_TAG}"
+            LATEST_TAG="${PREFIX}-latest"
+
+            if EXISTING=$(skopeo inspect --no-tags --format '{{.Digest}}' \
+                          "docker://${DEST_REPO}:${PINNED_TAG}" 2>/dev/null); then
+              if [ "${EXISTING}" = "${DIGEST}" ]; then
+                echo "${DEST_REPO}:${PINNED_TAG} already at ${EXISTING}; skipping pinned copy."
+              else
+                echo "${DEST_REPO}:${PINNED_TAG} exists with a different digest (${EXISTING}); overwriting."
+                skopeo copy --preserve-digests --retry-times=5 \
+                  "docker://${SOURCE_REPO}@${DIGEST}" \
+                  "docker://${DEST_REPO}:${PINNED_TAG}"
+              fi
+            else
+              echo "Mirroring ${SOURCE_REPO}@${DIGEST} -> ${DEST_REPO}:${PINNED_TAG}"
+              skopeo copy --preserve-digests --retry-times=5 \
+                "docker://${SOURCE_REPO}@${DIGEST}" \
+                "docker://${DEST_REPO}:${PINNED_TAG}"
+            fi
+
+            echo "Pointing ${DEST_REPO}:${LATEST_TAG} at ${DEST_REPO}:${PINNED_TAG}"
+            skopeo copy --preserve-digests --retry-times=5 \
+              "docker://${DEST_REPO}:${PINNED_TAG}" \
+              "docker://${DEST_REPO}:${LATEST_TAG}"
+
 workflows:
   build:
     jobs:
@@ -19,3 +147,28 @@ workflows:
               only: /^v.*/
             branches:
               ignore: /.*/
+
+  # Daily mirror of the spark-arena upstream nightly into gsoci. Both eugr
+  # and eugr-tf5 variants are mirrored in parallel; either failing leaves the
+  # other intact thanks to the per-job structure (no cross-leg dependency).
+  # Manual / on-demand runs: trigger via the CircleCI UI by re-running this
+  # workflow on main (or by pushing an empty commit if you need to override
+  # `source_tag`, since CircleCI doesn't expose typed inputs in the UI).
+  mirror-spark-arena-nightly:
+    triggers:
+      - schedule:
+          cron: "0 6 * * *"
+          filters:
+            branches:
+              only: main
+    jobs:
+      - mirror-spark-arena:
+          context: architect
+          name: mirror-eugr
+          source_image: dgx-vllm-eugr-nightly
+          tag_prefix: eugr
+      - mirror-spark-arena:
+          context: architect
+          name: mirror-eugr-tf5
+          source_image: dgx-vllm-eugr-nightly-tf5
+          tag_prefix: eugr-tf5
