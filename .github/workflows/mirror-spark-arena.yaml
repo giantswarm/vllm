@@ -1,0 +1,146 @@
+---
+# Mirror spark-arena dgx-vllm-eugr-nightly[-tf5] images to gsoci.
+#
+# Why: The DGX Spark "spark-arena" recipe-registry pulls ghcr.io/spark-arena/
+# dgx-vllm-eugr-nightly[-tf5]:latest. Those images bake in tool-call /
+# reasoning parsers (glm47, gemma4, minimax_m2, qwen3, qwen3_coder, super_v3),
+# fastsafetensors, --kv-cache-dtype fp8 wiring, and a few eugr-only CLI flags
+# that the recipes depend on. Re-tagging upstream digests onto our own gsoci
+# repo keeps the air-gapped cluster pulling from gsoci while staying byte-
+# identical with whatever spark-arena tested last night.
+#
+# Tag scheme on gsoci.azurecr.io/giantswarm/vllm:
+#   eugr-<YYYYMMDDNN>           - non-tf5 variant, pinned to upstream date-rev
+#   eugr-tf5-<YYYYMMDDNN>       - tf5 variant, pinned to upstream date-rev
+#   eugr-latest, eugr-tf5-latest - moving alias, retagged each successful run
+#
+# Runs daily at 06:00 UTC (eugr cuts a new build most days around 02-04 UTC).
+# Can also be invoked manually via workflow_dispatch with an explicit tag.
+#
+# Required repository secrets:
+#   AZURE_GSOCI_USERNAME - SP / token with push rights on giantswarm/vllm
+#   AZURE_GSOCI_PASSWORD - matching credential
+# yamllint disable rule:truthy
+name: Mirror spark-arena vLLM image to gsoci
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+    inputs:
+      source_tag:
+        description: "Upstream tag to mirror (e.g. 2026041801, default: latest)"
+        required: false
+        default: "latest"
+
+permissions:
+  contents: read
+
+jobs:
+  mirror:
+    name: ${{ matrix.upstream }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - upstream: dgx-vllm-eugr-nightly
+            prefix: eugr
+          - upstream: dgx-vllm-eugr-nightly-tf5
+            prefix: eugr-tf5
+    env:
+      SOURCE_REPO: ghcr.io/spark-arena/${{ matrix.upstream }}
+      DEST_REPO: gsoci.azurecr.io/giantswarm/vllm
+      PREFIX: ${{ matrix.prefix }}
+      INPUT_TAG: ${{ github.event.inputs.source_tag || 'latest' }}
+    steps:
+      - name: Install skopeo + jq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends skopeo jq
+
+      - name: Resolve upstream digest and date-rev tag
+        id: resolve
+        run: |
+          set -euo pipefail
+          DIGEST=$(skopeo inspect --no-tags --format '{{.Digest}}' \
+            "docker://${SOURCE_REPO}:${INPUT_TAG}")
+          echo "Source ${SOURCE_REPO}:${INPUT_TAG} digest: ${DIGEST}"
+
+          DATE_TAG=""
+          if [[ "${INPUT_TAG}" =~ ^[0-9]{8,10}$ ]]; then
+            DATE_TAG="${INPUT_TAG}"
+          else
+            for cand in $(skopeo list-tags "docker://${SOURCE_REPO}" \
+                          | jq -r '.Tags[]' \
+                          | grep -E '^[0-9]{10}$' \
+                          | sort -ru | head -20); do
+              CDIG=$(skopeo inspect --no-tags --format '{{.Digest}}' \
+                "docker://${SOURCE_REPO}:${cand}" 2>/dev/null || echo "")
+              if [ "${CDIG}" = "${DIGEST}" ]; then
+                DATE_TAG="${cand}"
+                break
+              fi
+            done
+          fi
+
+          if [ -z "${DATE_TAG}" ]; then
+            echo "ERROR: could not resolve a date-rev tag for digest ${DIGEST}" >&2
+            exit 1
+          fi
+          echo "Resolved date-rev tag: ${DATE_TAG}"
+          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+          echo "date_tag=${DATE_TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Login to gsoci.azurecr.io
+        uses: docker/login-action@v3
+        with:
+          registry: gsoci.azurecr.io
+          username: ${{ secrets.AZURE_GSOCI_USERNAME }}
+          password: ${{ secrets.AZURE_GSOCI_PASSWORD }}
+
+      - name: Check whether destination tag is already mirrored
+        id: check
+        env:
+          DATE_TAG: ${{ steps.resolve.outputs.date_tag }}
+          SRC_DIGEST: ${{ steps.resolve.outputs.digest }}
+        run: |
+          set -euo pipefail
+          DEST_TAG="${PREFIX}-${DATE_TAG}"
+          if EXISTING=$(skopeo inspect --no-tags --format '{{.Digest}}' \
+                       "docker://${DEST_REPO}:${DEST_TAG}" 2>/dev/null); then
+            if [ "${EXISTING}" = "${SRC_DIGEST}" ]; then
+              echo "${DEST_REPO}:${DEST_TAG} already at ${EXISTING}; pinned copy will be skipped."
+              echo "skip_pinned=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "${DEST_REPO}:${DEST_TAG} exists with a different digest (${EXISTING}); will overwrite."
+              echo "skip_pinned=false" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "${DEST_REPO}:${DEST_TAG} not yet present; will mirror."
+            echo "skip_pinned=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Mirror upstream digest to pinned destination tag
+        if: steps.check.outputs.skip_pinned != 'true'
+        env:
+          DATE_TAG: ${{ steps.resolve.outputs.date_tag }}
+          SRC_DIGEST: ${{ steps.resolve.outputs.digest }}
+        run: |
+          set -euo pipefail
+          DEST_TAG="${PREFIX}-${DATE_TAG}"
+          echo "Mirroring ${SOURCE_REPO}@${SRC_DIGEST} -> ${DEST_REPO}:${DEST_TAG}"
+          skopeo copy --preserve-digests --retry-times=5 \
+            "docker://${SOURCE_REPO}@${SRC_DIGEST}" \
+            "docker://${DEST_REPO}:${DEST_TAG}"
+
+      - name: Re-tag pinned mirror as floating ${{ matrix.prefix }}-latest
+        env:
+          DATE_TAG: ${{ steps.resolve.outputs.date_tag }}
+        run: |
+          set -euo pipefail
+          PINNED_TAG="${PREFIX}-${DATE_TAG}"
+          LATEST_TAG="${PREFIX}-latest"
+          echo "Pointing ${DEST_REPO}:${LATEST_TAG} at ${DEST_REPO}:${PINNED_TAG}"
+          skopeo copy --preserve-digests --retry-times=5 \
+            "docker://${DEST_REPO}:${PINNED_TAG}" \
+            "docker://${DEST_REPO}:${LATEST_TAG}"

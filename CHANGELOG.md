@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `mirror-spark-arena.yaml` GitHub Actions workflow that mirrors `ghcr.io/spark-arena/dgx-vllm-eugr-nightly[-tf5]` upstream tags to `gsoci.azurecr.io/giantswarm/vllm:eugr[-tf5]-<YYYYMMDDNN>` daily (with `eugr-latest` / `eugr-tf5-latest` as moving aliases). Used by the BWI `bwi-vllm` / `bwi-vllm-tf5` ClusterServingRuntimes that follow the [spark-arena recipe registry](https://github.com/spark-arena/recipe-registry). Requires repo secrets `AZURE_GSOCI_USERNAME` and `AZURE_GSOCI_PASSWORD`.
+
 ## [0.3.0] - 2026-04-17
 
 ### Fixed

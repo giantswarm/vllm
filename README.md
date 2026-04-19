@@ -6,6 +6,17 @@ Giant Swarm build of [vLLM](https://github.com/vllm-project/vllm) for ARM64 (DGX
 
 The image is used as a KServe predictor via a `ClusterServingRuntime`. It exposes an OpenAI-compatible API at `:8080/v1`.
 
+## Image variants on `gsoci.azurecr.io/giantswarm/vllm`
+
+| Tag pattern | Source | Used for |
+|---|---|---|
+| `<semver>` (e.g. `0.3.3`) | This repo's `Dockerfile` (CircleCI build, NGC PyTorch + eugr wheels) | Existing single-image runtime (`bwi-kserve-vllm`, `kserve-vllm`) |
+| `eugr-<YYYYMMDDNN>` | Mirror of `ghcr.io/spark-arena/dgx-vllm-eugr-nightly:<tag>` | Spark-arena recipe-driven InferenceServices that need eugr-only parsers / flags |
+| `eugr-tf5-<YYYYMMDDNN>` | Mirror of `ghcr.io/spark-arena/dgx-vllm-eugr-nightly-tf5:<tag>` | Same, for models that require the `transformers from git` (`-tf5`) variant |
+| `eugr-latest`, `eugr-tf5-latest` | Floating alias retagged on each successful mirror run | Convenience for development; production should pin to a date tag |
+
+The `eugr-*` tags are populated by [`.github/workflows/mirror-spark-arena.yaml`](.github/workflows/mirror-spark-arena.yaml), which runs daily and can be triggered manually via `gh workflow run "Mirror spark-arena vLLM image to gsoci"`. The workflow needs the repository secrets `AZURE_GSOCI_USERNAME` and `AZURE_GSOCI_PASSWORD` (push credentials for `gsoci.azurecr.io/giantswarm/vllm`).
+
 ## How it works
 
 The Dockerfile does **not** build vLLM from source. Instead it:
