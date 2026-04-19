@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `mirror-spark-arena-nightly` CircleCI workflow that mirrors `ghcr.io/spark-arena/dgx-vllm-eugr-nightly[-tf5]` upstream tags to `gsoci.azurecr.io/giantswarm/vllm:eugr[-tf5]-<YYYYMMDDNN>` daily, with `eugr-latest` / `eugr-tf5-latest` floating aliases re-pointed on each successful run. Used by the BWI `bwi-vllm` / `bwi-vllm-tf5` `ClusterServingRuntime` objects in `giantswarm/bwi` that follow the [spark-arena recipe registry](https://github.com/spark-arena/recipe-registry). Re-uses the existing `architect` CircleCI context (`ACR_GSOCI_USERNAME` / `ACR_GSOCI_PASSWORD`) -- no new secrets to set.
+
 ## [0.3.0] - 2026-04-17
 
 ### Fixed
