@@ -1,0 +1,151 @@
+# Default values for vllm.
+# This is a YAML-formatted file.
+
+# image is the gsoci-built vLLM image used by the `bwi-kserve-vllm` runtime
+# (single self-contained variant baked from this repo's Dockerfile). The
+# sparkArena runtimes pin their own upstream date-rev tags via
+# `runtimes.sparkArena.<variant>.image.tag` overrides because they mirror
+# `ghcr.io/spark-arena/dgx-vllm-eugr-nightly[-tf5]` rather than this repo's
+# build output.
+image:
+  registry: gsoci.azurecr.io
+  repository: giantswarm/vllm
+  pullPolicy: IfNotPresent
+  # tag overrides the chart appVersion. Leave empty to track appVersion --
+  # the chart and image are released in lockstep so this is the common case.
+  tag: ""
+
+# partOfLabel is the value of the `app.kubernetes.io/part-of` label that the
+# bwi-clusterservingruntime ValidatingWebhookConfiguration in the BWI cluster
+# selects on. Override only if the consuming cluster's webhook keys off a
+# different marker.
+partOfLabel: bwi-backstage
+
+runtimes:
+  # vllm is the historical single-image runtime built from this repo's
+  # Dockerfile. Used for models that don't need spark-arena's eugr-only
+  # parsers / flags (e.g. mistral-small-4 today).
+  vllm:
+    enabled: true
+    name: bwi-kserve-vllm
+    autoSelect: true
+    priority: 2
+    # imagePullSecrets is per-runtime so the bwi-kserve-vllm runtime can
+    # reference the cluster-local pull secret without forcing the same
+    # secret on the spark-arena runtimes (those pull from gsoci too but
+    # using imagePullSecrets at the cluster default).
+    imagePullSecrets:
+      - name: teemow-gsoci-pull-secret
+    args:
+      - --model
+      - /mnt/models
+      - --port
+      - "8080"
+      - --served-model-name
+      - bwi-active
+      - "{{.Name}}"
+      - --trust-remote-code
+    env:
+      - name: HF_HUB_ENABLE_HF_TRANSFER
+        value: "1"
+      - name: HF_XET_HIGH_PERFORMANCE
+        value: "1"
+      - name: VLLM_CONFIG_ROOT
+        value: /tmp
+    resources:
+      requests:
+        cpu: "2"
+        memory: "24Gi"
+      limits:
+        cpu: "8"
+        memory: "64Gi"
+    startupProbe:
+      httpGet:
+        path: /health
+        port: 8080
+      initialDelaySeconds: 300
+      periodSeconds: 30
+      failureThreshold: 360
+    shmSize: "16Gi"
+
+  # sparkArena groups the two runtimes that mirror the spark-arena
+  # recipe-registry's upstream image variants (eugr / eugr-tf5). Both use
+  # `command: [vllm, serve]` because they're built on NVIDIA NGC's PyTorch
+  # base whose ENTRYPOINT swallows the args otherwise. tf5 carries
+  # `transformers from git` for models like GLM-4.7-Flash and Gemma 4.
+  sparkArena:
+    enabled: true
+    eugr:
+      enabled: true
+      name: bwi-vllm
+      # tag mirrors the most recent date-rev tag pinned by the
+      # mirror-spark-arena-nightly CircleCI workflow. Bump in lockstep
+      # with the image mirror cadence in the consuming cluster's
+      # bundle overlay rather than churning the chart for every nightly.
+      tag: eugr-2026041801
+      args:
+        - --model
+        - /mnt/models
+        - --port
+        - "8080"
+        - --served-model-name
+        - bwi-active
+        - "{{.Name}}"
+        - --trust-remote-code
+      env:
+        - name: HF_HUB_ENABLE_HF_TRANSFER
+          value: "1"
+        - name: HF_XET_HIGH_PERFORMANCE
+          value: "1"
+        - name: VLLM_CONFIG_ROOT
+          value: /tmp
+      resources:
+        requests:
+          cpu: "2"
+          memory: "24Gi"
+        limits:
+          cpu: "8"
+          memory: "64Gi"
+      startupProbe:
+        httpGet:
+          path: /health
+          port: 8080
+        initialDelaySeconds: 300
+        periodSeconds: 30
+        failureThreshold: 360
+      shmSize: "16Gi"
+    tf5:
+      enabled: true
+      name: bwi-vllm-tf5
+      tag: eugr-tf5-2026042101
+      args:
+        - --model
+        - /mnt/models
+        - --port
+        - "8080"
+        - --served-model-name
+        - bwi-active
+        - "{{.Name}}"
+        - --trust-remote-code
+      env:
+        - name: HF_HUB_ENABLE_HF_TRANSFER
+          value: "1"
+        - name: HF_XET_HIGH_PERFORMANCE
+          value: "1"
+        - name: VLLM_CONFIG_ROOT
+          value: /tmp
+      resources:
+        requests:
+          cpu: "2"
+          memory: "24Gi"
+        limits:
+          cpu: "8"
+          memory: "64Gi"
+      startupProbe:
+        httpGet:
+          path: /health
+          port: 8080
+        initialDelaySeconds: 300
+        periodSeconds: 30
+        failureThreshold: 360
+      shmSize: "16Gi"

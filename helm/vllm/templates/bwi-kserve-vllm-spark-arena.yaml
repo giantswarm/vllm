@@ -1,0 +1,76 @@
+{{/*
+Spark-arena recipe-aligned vLLM ClusterServingRuntimes.
+
+Two runtimes per cluster:
+  bwi-vllm     -> mirror of ghcr.io/spark-arena/dgx-vllm-eugr-nightly
+  bwi-vllm-tf5 -> mirror of ghcr.io/spark-arena/dgx-vllm-eugr-nightly-tf5
+
+The non-tf5 image is the default; tf5 carries `transformers from git` and is
+required for models like GLM-4.7-Flash and Gemma 4 that ship config classes
+not yet in stable transformers.
+
+Both images are mirrored into gsoci by the `mirror-spark-arena-nightly`
+CircleCI workflow in giantswarm/vllm and re-tagged as
+`eugr[-tf5]-<YYYYMMDDNN>`. Tags are date-pinned for reproducible boots.
+
+`autoSelect: false` on both: the historical `bwi-kserve-vllm` runtime already
+auto-selects the vLLM modelFormat, so InferenceServices that need the
+spark-arena image stack opt in explicitly via
+`spec.predictor.model.runtime: bwi-vllm` (or `bwi-vllm-tf5`).
+
+`command: [vllm, serve]` is required because the eugr nightly is built on
+the NVIDIA NGC PyTorch base image whose ENTRYPOINT is
+`/opt/nvidia/nvidia_entrypoint.sh`, which only `exec "$@"`s the args -- so
+passing only flags fails with `exec: --: invalid option`. The legacy
+`bwi-kserve-vllm` runtime bakes `ENTRYPOINT ["vllm", "serve"]` directly,
+which is why the same args block works there without a command override.
+*/}}
+{{- if .Values.runtimes.sparkArena.enabled -}}
+{{- range $variantKey, $variant := .Values.runtimes.sparkArena -}}
+{{- if and (kindIs "map" $variant) $variant.enabled }}
+---
+apiVersion: serving.kserve.io/v1alpha1
+kind: ClusterServingRuntime
+metadata:
+  name: {{ $variant.name }}
+  labels:
+    {{- include "vllm.labels" $ | nindent 4 }}
+spec:
+  annotations:
+    prometheus.kserve.io/path: /metrics
+    prometheus.kserve.io/port: "8080"
+  containers:
+    - name: kserve-container
+      image: {{ include "vllm.sparkArenaImage" (dict "Values" $.Values "Chart" $.Chart "Variant" $variant) }}
+      command:
+        - vllm
+        - serve
+      args:
+        {{- toYaml $variant.args | nindent 8 }}
+      env:
+        {{- toYaml $variant.env | nindent 8 }}
+      ports:
+        - containerPort: 8080
+          protocol: TCP
+      resources:
+        {{- toYaml $variant.resources | nindent 8 }}
+      volumeMounts:
+        - name: dshm
+          mountPath: /dev/shm
+      startupProbe:
+        {{- toYaml $variant.startupProbe | nindent 8 }}
+  volumes:
+    - name: dshm
+      emptyDir:
+        medium: Memory
+        sizeLimit: {{ $variant.shmSize | quote }}
+  protocolVersions:
+    - v1
+    - v2
+  supportedModelFormats:
+    - autoSelect: false
+      name: vLLM
+      version: "1"
+{{- end }}
+{{- end }}
+{{- end }}

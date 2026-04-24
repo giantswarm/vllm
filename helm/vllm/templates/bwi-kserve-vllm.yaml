@@ -1,0 +1,47 @@
+{{- if .Values.runtimes.vllm.enabled -}}
+{{- $r := .Values.runtimes.vllm -}}
+apiVersion: serving.kserve.io/v1alpha1
+kind: ClusterServingRuntime
+metadata:
+  name: {{ $r.name }}
+  labels:
+    {{- include "vllm.labels" . | nindent 4 }}
+spec:
+  annotations:
+    prometheus.kserve.io/path: /metrics
+    prometheus.kserve.io/port: "8080"
+  {{- with $r.imagePullSecrets }}
+  imagePullSecrets:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  containers:
+    - name: kserve-container
+      image: {{ include "vllm.image" . }}
+      args:
+        {{- toYaml $r.args | nindent 8 }}
+      env:
+        {{- toYaml $r.env | nindent 8 }}
+      ports:
+        - containerPort: 8080
+          protocol: TCP
+      resources:
+        {{- toYaml $r.resources | nindent 8 }}
+      volumeMounts:
+        - name: dshm
+          mountPath: /dev/shm
+      startupProbe:
+        {{- toYaml $r.startupProbe | nindent 8 }}
+  volumes:
+    - name: dshm
+      emptyDir:
+        medium: Memory
+        sizeLimit: {{ $r.shmSize | quote }}
+  protocolVersions:
+    - v1
+    - v2
+  supportedModelFormats:
+    - autoSelect: {{ $r.autoSelect }}
+      name: vLLM
+      priority: {{ $r.priority }}
+      version: "1"
+{{- end }}
