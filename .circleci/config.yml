@@ -148,6 +148,27 @@ workflows:
             branches:
               ignore: /.*/
 
+      # Chart: vllm (ClusterServingRuntimes for KServe).
+      # Pushed to oci://gsoci.azurecr.io/charts/giantswarm/vllm so the BWI
+      # OCM bundle in giantswarm/bwi can reference it as a per-app component
+      # (see architecture/bwi.md). Chart version follows the git tag; the
+      # chart's appVersion pins the bwi-kserve-vllm image tag in lockstep.
+      - architect/push-to-app-catalog:
+          context: architect
+          name: build-vllm-chart
+          app_catalog: giantswarm-catalog
+          app_catalog_test: giantswarm-test-catalog
+          chart: vllm
+          push_to_appcatalog: false
+          push_to_oci_registry: true
+          persist_chart_archive: true
+          filters:
+            tags:
+              only: /^v.*/
+            branches:
+              ignore:
+                - main
+
   # Daily mirror of the spark-arena upstream nightly into gsoci. Both eugr
   # and eugr-tf5 variants are mirrored in parallel; either failing leaves the
   # other intact thanks to the per-job structure (no cross-leg dependency).

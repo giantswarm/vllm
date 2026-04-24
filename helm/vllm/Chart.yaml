@@ -1,0 +1,27 @@
+apiVersion: v2
+name: vllm
+description: A Helm chart for vLLM ClusterServingRuntimes (DGX Spark / Blackwell)
+type: application
+# Both `version` and `appVersion` are substituted by the architect orb's
+# `helm template --tag-build` step at chart-build time using the git tag, so
+# the chart and the bwi-kserve-vllm image always release in lockstep from a
+# single git tag (mirrors the muster pattern). Spark-arena runtime variants
+# pin their own date-rev mirror tags via values overrides because they track
+# the upstream nightly cadence rather than this repo's release tags.
+version: "[[ .Version ]]"
+appVersion: "[[ .Version ]]"
+home: https://github.com/giantswarm/vllm
+sources:
+  - https://github.com/giantswarm/vllm
+keywords:
+  - vllm
+  - kserve
+  - clusterservingruntime
+  - inference
+  - llm
+maintainers:
+  - name: Giant Swarm
+    email: support@giantswarm.io
+annotations:
+  application.giantswarm.io/team: bumblebee
+  io.giantswarm.application.audience: all

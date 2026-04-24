@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Helm chart at `helm/vllm/` packaging the `bwi-kserve-vllm`, `bwi-vllm`, and `bwi-vllm-tf5` `ClusterServingRuntime` manifests previously hand-maintained in `giantswarm/bwi/kserve/`. Chart `version` and `appVersion` are templated as `[[ .Version ]]` so the architect orb substitutes both with the git tag at build time, keeping chart and `bwi-kserve-vllm` image in lockstep from a single tag. Spark-arena variants pin their own date-rev mirror tags via values overrides. Published to `oci://gsoci.azurecr.io/charts/giantswarm/vllm` by the new `build-vllm-chart` CircleCI job on every `v*` tag. Required by the BWI OCM bundle in `giantswarm/bwi` so every per-app component is a chart + image combination.
 - `mirror-spark-arena-nightly` CircleCI workflow that mirrors `ghcr.io/spark-arena/dgx-vllm-eugr-nightly[-tf5]` upstream tags to `gsoci.azurecr.io/giantswarm/vllm:eugr[-tf5]-<YYYYMMDDNN>` daily, with `eugr-latest` / `eugr-tf5-latest` floating aliases re-pointed on each successful run. Used by the BWI `bwi-vllm` / `bwi-vllm-tf5` `ClusterServingRuntime` objects in `giantswarm/bwi` that follow the [spark-arena recipe registry](https://github.com/spark-arena/recipe-registry). Re-uses the existing `architect` CircleCI context (`ACR_GSOCI_USERNAME` / `ACR_GSOCI_PASSWORD`) -- no new secrets to set.
 
 ## [0.3.0] - 2026-04-17

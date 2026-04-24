@@ -3,8 +3,9 @@
 Giant Swarm build of [vLLM](https://github.com/vllm-project/vllm) for ARM64 (DGX Spark with Blackwell GPUs). Produces:
 
 - **Container image**: `gsoci.azurecr.io/giantswarm/vllm` (ARM64 only)
+- **Helm chart**: `oci://gsoci.azurecr.io/charts/giantswarm/vllm` (ships the `bwi-kserve-vllm`, `bwi-vllm`, `bwi-vllm-tf5` `ClusterServingRuntime` manifests; see [`helm/vllm/README.md`](./helm/vllm/README.md))
 
-The image is used as a KServe predictor via a `ClusterServingRuntime`. It exposes an OpenAI-compatible API at `:8080/v1`.
+The image is used as a KServe predictor via a `ClusterServingRuntime`. It exposes an OpenAI-compatible API at `:8080/v1`. The chart is referenced as the `vllm-runtime` per-app component of the BWI OCM bundle in `giantswarm/bwi` so every per-app component in that bundle is a chart + image combination.
 
 ## Image variants on `gsoci.azurecr.io/giantswarm/vllm`
 
