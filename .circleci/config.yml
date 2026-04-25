@@ -21,7 +21,7 @@ jobs:
   #   eugr-latest, eugr-tf5-latest - moving alias, retagged each successful run
   mirror-spark-arena:
     docker:
-      - image: gsoci.azurecr.io/giantswarm/skopeo:v1.19.0
+      - image: gsoci.azurecr.io/giantswarm/skopeo:v1.22.2
     resource_class: small
     shell: /bin/bash
     parameters:
