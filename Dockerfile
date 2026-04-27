@@ -8,7 +8,7 @@
 # Prebuilt wheels source: https://github.com/eugr/spark-vllm-docker/releases
 
 # renovate: datasource=docker depName=nvcr.io/nvidia/pytorch
-FROM nvcr.io/nvidia/pytorch:26.03-py3
+FROM nvcr.io/nvidia/pytorch:26.04-py3
 
 ENV UV_SYSTEM_PYTHON=1
 ENV UV_BREAK_SYSTEM_PACKAGES=1
