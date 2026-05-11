@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `runtimes.vllm.imagePullSecrets` default is now empty. The previous default referenced the now-retired `teemow-gsoci-pull-secret`, causing `FailedToRetrieveImagePullSecret` warnings on every `bwi-kserve-vllm` predictor pod create on clusters where the secret no longer exists (spidertron, demorack). Clusters that need authenticated pulls can attach a per-runtime secret via the bundle's HelmRelease values. Mirrors `giantswarm/bwi#55` for the cluster-local CSR copies that the same fix already shipped.
+
 ### Added
 
 - Helm chart at `helm/vllm/` packaging the `bwi-kserve-vllm`, `bwi-vllm`, and `bwi-vllm-tf5` `ClusterServingRuntime` manifests previously hand-maintained in `giantswarm/bwi/kserve/`. Chart `version` and `appVersion` are templated as `[[ .Version ]]` so the architect orb substitutes both with the git tag at build time, keeping chart and `bwi-kserve-vllm` image in lockstep from a single tag. Spark-arena variants pin their own date-rev mirror tags via values overrides. Published to `oci://gsoci.azurecr.io/charts/giantswarm/vllm` by the new `build-vllm-chart` CircleCI job on every `v*` tag. Required by the BWI OCM bundle in `giantswarm/bwi` so every per-app component is a chart + image combination.
