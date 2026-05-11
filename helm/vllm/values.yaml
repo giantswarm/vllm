@@ -30,12 +30,17 @@ runtimes:
     name: bwi-kserve-vllm
     autoSelect: true
     priority: 2
-    # imagePullSecrets is per-runtime so the bwi-kserve-vllm runtime can
-    # reference the cluster-local pull secret without forcing the same
-    # secret on the spark-arena runtimes (those pull from gsoci too but
-    # using imagePullSecrets at the cluster default).
-    imagePullSecrets:
-      - name: teemow-gsoci-pull-secret
+    # imagePullSecrets is per-runtime so a cluster that does need an
+    # authenticated registry can attach a pull secret to this runtime
+    # without forcing the same secret on the spark-arena runtimes. The
+    # default is empty because every cluster the bundle ships to today
+    # (spidertron, demorack) pulls anonymously -- spidertron uses
+    # gsoci's anon bearer (the historical `teemow-gsoci-pull-secret`
+    # was a short-lived `az acr login` JWT that expired the same day it
+    # was issued, see giantswarm/bwi#55), demorack uses the unauth
+    # in-cluster Zot mirror. Leaving a stale secret name here causes
+    # FailedToRetrieveImagePullSecret warnings on every pod create.
+    imagePullSecrets: []
     args:
       - --model
       - /mnt/models
