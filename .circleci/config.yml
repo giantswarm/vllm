@@ -1,7 +1,7 @@
 version: 2.1
 
 orbs:
-  architect: giantswarm/architect@8.0.2
+  architect: giantswarm/architect@8.1.0
 
 jobs:
   # Mirror spark-arena dgx-vllm-eugr-nightly[-tf5] to gsoci.
@@ -136,8 +136,9 @@ workflows:
     jobs:
       # Tag builds: ARM64 only (target is DGX Spark with Blackwell GPUs).
       # The Dockerfile downloads prebuilt wheels -- no GPU needed at build time.
-      - architect/push-to-registries-multiarch:
+      - architect/push-to-registries:
           context: architect
+          multiarch: true
           name: push-to-registries-release
           image: giantswarm/vllm
           platforms: "linux/arm64"
