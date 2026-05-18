@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Enable `split-china-push: true` on the tag-build `push-to-registries-release` job and add a companion `sync-china-registry` job. The cross-Pacific `docker buildx` push to the Aliyun mirror (~10 minute timeout) is replaced with a `regctl image copy` from gsoci to Aliyun executed on the in-China `giantswarm/galaxy-runner` self-hosted CircleCI runner.
 - Bump `giantswarm/architect` orb to `8.1.0` and migrate the tag-build image push from the deprecated `push-to-registries-multiarch` job to `push-to-registries` with `multiarch: true`. Picks up automatic QEMU/binfmt registration for the arm64-only build, hardened buildx bootstrap, and standard OCI image labels.
 - `runtimes.vllm.imagePullSecrets` default is now empty. The previous default referenced the now-retired `teemow-gsoci-pull-secret`, causing `FailedToRetrieveImagePullSecret` warnings on every `bwi-kserve-vllm` predictor pod create on clusters where the secret no longer exists (spidertron, demorack). Clusters that need authenticated pulls can attach a per-runtime secret via the bundle's HelmRelease values. Mirrors `giantswarm/bwi#55` for the cluster-local CSR copies that the same fix already shipped.
 
