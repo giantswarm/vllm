@@ -136,6 +136,8 @@ workflows:
     jobs:
       # Tag builds: ARM64 only (target is DGX Spark with Blackwell GPUs).
       # The Dockerfile downloads prebuilt wheels -- no GPU needed at build time.
+      # split-china-push skips the Aliyun mirror; sync-china-registry below
+      # mirrors the image from gsoci to Aliyun via the in-China galaxy-runner.
       - architect/push-to-registries:
           context: architect
           multiarch: true
@@ -143,6 +145,20 @@ workflows:
           image: giantswarm/vllm
           platforms: "linux/arm64"
           force-public: true
+          split-china-push: true
+          filters:
+            tags:
+              only: /^v.*/
+            branches:
+              ignore: /.*/
+
+      # Mirror gsoci -> Aliyun via the in-China giantswarm/galaxy-runner.
+      - architect/sync-china-registry:
+          context: architect
+          name: sync-china-registry
+          image: giantswarm/vllm
+          requires:
+            - push-to-registries-release
           filters:
             tags:
               only: /^v.*/
