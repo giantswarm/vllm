@@ -11,6 +11,7 @@ type: application
 version: "[[ .Version ]]"
 appVersion: "[[ .Version ]]"
 home: https://github.com/giantswarm/vllm
+icon: https://s.giantswarm.io/app-icons/vllm/1/light.svg
 sources:
   - https://github.com/giantswarm/vllm
 keywords:
