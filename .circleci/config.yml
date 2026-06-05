@@ -1,7 +1,7 @@
 version: 2.1
 
 orbs:
-  architect: giantswarm/architect@8.3.0
+  architect: giantswarm/architect@9.1.0
 
 jobs:
   # Mirror spark-arena dgx-vllm-eugr-nightly[-tf5] to gsoci.
@@ -140,7 +140,6 @@ workflows:
       # mirrors the image from gsoci to Aliyun via the in-China galaxy-runner.
       - architect/push-to-registries:
           context: architect
-          multiarch: true
           name: push-to-registries-release
           image: giantswarm/vllm
           platforms: "linux/arm64"
