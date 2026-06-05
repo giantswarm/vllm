@@ -32,7 +32,5 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 app.kubernetes.io/part-of: {{ .Values.partOfLabel }}
-{{- with (index .Chart.Annotations "application.giantswarm.io/team") }}
-application.giantswarm.io/team: {{ . | quote }}
-{{- end }}
+application.giantswarm.io/team: {{ index .Chart.Annotations "application.giantswarm.io/team" | quote }}
 {{- end -}}
