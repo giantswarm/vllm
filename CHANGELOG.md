@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-06-21
+
 ### Changed
 
 
@@ -48,3 +50,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI pipeline via architect-orb to build and push to gsoci.
 - Prebuilt vLLM and FlashInfer wheels from eugr/spark-vllm-docker releases.
 - Mistral Small 4 support (mistral-common >= 1.10.0, transformers from git).
+
+[Unreleased]: https://github.com/giantswarm/vllm/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/giantswarm/vllm/compare/v0.3.28...v0.4.0
