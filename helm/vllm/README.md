@@ -1,58 +1,109 @@
 # vllm
 
-Helm chart that ships KServe `ClusterServingRuntime` manifests for the Giant
-Swarm vLLM image (`gsoci.azurecr.io/giantswarm/vllm`) on DGX Spark / Blackwell
-hardware. The chart is the packaging boundary the BWI OCM bundle references
-(see `architecture/bwi.md` in `giantswarm/bwi`); each runtime can be toggled
-independently via values flags so the same chart serves both today's
-single-image deployment and the spark-arena recipe-driven variants.
+A Helm chart for vLLM ClusterServingRuntimes (DGX Spark / Blackwell)
 
-## Runtimes
+**Homepage:** <https://github.com/giantswarm/vllm>
 
-| Name | Source image | Default | Used for |
-|---|---|---|---|
-| `bwi-kserve-vllm` | This repo's Dockerfile (NGC PyTorch + eugr wheels), tag tracks chart `appVersion` | autoSelect | Models that don't need spark-arena's eugr-only parsers / flags |
-| `bwi-vllm` | Mirror of `ghcr.io/spark-arena/dgx-vllm-eugr-nightly`, tag pinned to `eugr-<YYYYMMDDNN>` | opt-in via `spec.predictor.model.runtime` | Spark-arena recipe registry models |
-| `bwi-vllm-tf5` | Mirror of `ghcr.io/spark-arena/dgx-vllm-eugr-nightly-tf5`, tag pinned to `eugr-tf5-<YYYYMMDDNN>` | opt-in via `spec.predictor.model.runtime` | Models that need `transformers from git` (GLM-4.7-Flash, Gemma 4) |
+## Maintainers
 
-The spark-arena runtimes require `command: [vllm, serve]` because the upstream
-nightly is built on NVIDIA NGC's PyTorch base whose `ENTRYPOINT` swallows the
-container `args:` block otherwise. The legacy single-image runtime bakes the
-entrypoint into the Dockerfile so it doesn't need the override.
+| Name | Email | Url |
+| ---- | ------ | --- |
+| Giant Swarm | <support@giantswarm.io> |  |
 
-All runtimes carry the `app.kubernetes.io/part-of: bwi-backstage` label
-(configurable via `partOfLabel`) so the BWI cluster's
-`bwi-clusterservingruntime` `ValidatingWebhookConfiguration` selects on them
-without intercepting non-BWI runtimes cluster-wide.
+## Source Code
 
-## Image / chart versioning
-
-`Chart.yaml#version` and `Chart.yaml#appVersion` are both templated as
-`[[ .Version ]]` and substituted by the architect orb's
-`helm template --tag-build` step at chart-build time, so a `v0.x.y` git tag
-produces a chart with `version: 0.x.y` and `appVersion: 0.x.y` that bundles
-the matching `bwi-kserve-vllm` image (mirrors the muster pattern). Spark-arena
-variants pin their own date-rev mirror tags via
-`runtimes.sparkArena.<variant>.tag` because they track the upstream
-`mirror-spark-arena-nightly` cadence rather than this repo's release tags.
-
-The chart is published as an OCI artifact at
-`oci://gsoci.azurecr.io/charts/giantswarm/vllm` by the `build-vllm-chart`
-CircleCI job on every `v*` tag.
-
-For local helm CLI use (`helm lint`, `helm template`), run `make helm-lint` /
-`make helm-template` -- those targets stage the chart into `build/vllm/` with
-a stub `0.0.0` version substituted in so the Helm CLI doesn't trip on the
-template placeholders.
+* <https://github.com/giantswarm/vllm>
 
 ## Values
 
-See `values.yaml`. The most common overrides:
-
-- `image.tag` -- pin a different `bwi-kserve-vllm` image (e.g. for testing a
-  new build before bumping the chart).
-- `runtimes.vllm.enabled: false` -- skip the legacy runtime when the cluster
-  only needs the spark-arena variants.
-- `runtimes.sparkArena.eugr.tag` / `runtimes.sparkArena.tf5.tag` -- bump the
-  date-rev mirror tag without rebuilding the chart.
-- `runtimes.sparkArena.enabled: false` -- skip both spark-arena variants.
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| image.registry | string | `"gsoci.azurecr.io"` |  |
+| image.repository | string | `"giantswarm/vllm"` |  |
+| image.pullPolicy | string | `"IfNotPresent"` |  |
+| image.tag | string | `""` |  |
+| partOfLabel | string | `"bwi-backstage"` |  |
+| runtimes.vllm.enabled | bool | `true` |  |
+| runtimes.vllm.name | string | `"bwi-kserve-vllm"` |  |
+| runtimes.vllm.autoSelect | bool | `true` |  |
+| runtimes.vllm.priority | int | `2` |  |
+| runtimes.vllm.imagePullSecrets | list | `[]` |  |
+| runtimes.vllm.args[0] | string | `"--model"` |  |
+| runtimes.vllm.args[1] | string | `"/mnt/models"` |  |
+| runtimes.vllm.args[2] | string | `"--port"` |  |
+| runtimes.vllm.args[3] | string | `"8080"` |  |
+| runtimes.vllm.args[4] | string | `"--served-model-name"` |  |
+| runtimes.vllm.args[5] | string | `"bwi-active"` |  |
+| runtimes.vllm.args[6] | string | `"{{.Name}}"` |  |
+| runtimes.vllm.args[7] | string | `"--trust-remote-code"` |  |
+| runtimes.vllm.env[0].name | string | `"HF_HUB_ENABLE_HF_TRANSFER"` |  |
+| runtimes.vllm.env[0].value | string | `"1"` |  |
+| runtimes.vllm.env[1].name | string | `"HF_XET_HIGH_PERFORMANCE"` |  |
+| runtimes.vllm.env[1].value | string | `"1"` |  |
+| runtimes.vllm.env[2].name | string | `"VLLM_CONFIG_ROOT"` |  |
+| runtimes.vllm.env[2].value | string | `"/tmp"` |  |
+| runtimes.vllm.resources.requests.cpu | string | `"2"` |  |
+| runtimes.vllm.resources.requests.memory | string | `"24Gi"` |  |
+| runtimes.vllm.resources.limits.cpu | string | `"8"` |  |
+| runtimes.vllm.resources.limits.memory | string | `"64Gi"` |  |
+| runtimes.vllm.startupProbe.httpGet.path | string | `"/health"` |  |
+| runtimes.vllm.startupProbe.httpGet.port | int | `8080` |  |
+| runtimes.vllm.startupProbe.initialDelaySeconds | int | `300` |  |
+| runtimes.vllm.startupProbe.periodSeconds | int | `30` |  |
+| runtimes.vllm.startupProbe.failureThreshold | int | `360` |  |
+| runtimes.vllm.shmSize | string | `"16Gi"` |  |
+| runtimes.sparkArena.enabled | bool | `true` |  |
+| runtimes.sparkArena.eugr.enabled | bool | `true` |  |
+| runtimes.sparkArena.eugr.name | string | `"bwi-vllm"` |  |
+| runtimes.sparkArena.eugr.tag | string | `"eugr-2026041801"` |  |
+| runtimes.sparkArena.eugr.args[0] | string | `"--model"` |  |
+| runtimes.sparkArena.eugr.args[1] | string | `"/mnt/models"` |  |
+| runtimes.sparkArena.eugr.args[2] | string | `"--port"` |  |
+| runtimes.sparkArena.eugr.args[3] | string | `"8080"` |  |
+| runtimes.sparkArena.eugr.args[4] | string | `"--served-model-name"` |  |
+| runtimes.sparkArena.eugr.args[5] | string | `"bwi-active"` |  |
+| runtimes.sparkArena.eugr.args[6] | string | `"{{.Name}}"` |  |
+| runtimes.sparkArena.eugr.args[7] | string | `"--trust-remote-code"` |  |
+| runtimes.sparkArena.eugr.env[0].name | string | `"HF_HUB_ENABLE_HF_TRANSFER"` |  |
+| runtimes.sparkArena.eugr.env[0].value | string | `"1"` |  |
+| runtimes.sparkArena.eugr.env[1].name | string | `"HF_XET_HIGH_PERFORMANCE"` |  |
+| runtimes.sparkArena.eugr.env[1].value | string | `"1"` |  |
+| runtimes.sparkArena.eugr.env[2].name | string | `"VLLM_CONFIG_ROOT"` |  |
+| runtimes.sparkArena.eugr.env[2].value | string | `"/tmp"` |  |
+| runtimes.sparkArena.eugr.resources.requests.cpu | string | `"2"` |  |
+| runtimes.sparkArena.eugr.resources.requests.memory | string | `"24Gi"` |  |
+| runtimes.sparkArena.eugr.resources.limits.cpu | string | `"8"` |  |
+| runtimes.sparkArena.eugr.resources.limits.memory | string | `"64Gi"` |  |
+| runtimes.sparkArena.eugr.startupProbe.httpGet.path | string | `"/health"` |  |
+| runtimes.sparkArena.eugr.startupProbe.httpGet.port | int | `8080` |  |
+| runtimes.sparkArena.eugr.startupProbe.initialDelaySeconds | int | `300` |  |
+| runtimes.sparkArena.eugr.startupProbe.periodSeconds | int | `30` |  |
+| runtimes.sparkArena.eugr.startupProbe.failureThreshold | int | `360` |  |
+| runtimes.sparkArena.eugr.shmSize | string | `"16Gi"` |  |
+| runtimes.sparkArena.tf5.enabled | bool | `true` |  |
+| runtimes.sparkArena.tf5.name | string | `"bwi-vllm-tf5"` |  |
+| runtimes.sparkArena.tf5.tag | string | `"eugr-tf5-2026042101"` |  |
+| runtimes.sparkArena.tf5.args[0] | string | `"--model"` |  |
+| runtimes.sparkArena.tf5.args[1] | string | `"/mnt/models"` |  |
+| runtimes.sparkArena.tf5.args[2] | string | `"--port"` |  |
+| runtimes.sparkArena.tf5.args[3] | string | `"8080"` |  |
+| runtimes.sparkArena.tf5.args[4] | string | `"--served-model-name"` |  |
+| runtimes.sparkArena.tf5.args[5] | string | `"bwi-active"` |  |
+| runtimes.sparkArena.tf5.args[6] | string | `"{{.Name}}"` |  |
+| runtimes.sparkArena.tf5.args[7] | string | `"--trust-remote-code"` |  |
+| runtimes.sparkArena.tf5.env[0].name | string | `"HF_HUB_ENABLE_HF_TRANSFER"` |  |
+| runtimes.sparkArena.tf5.env[0].value | string | `"1"` |  |
+| runtimes.sparkArena.tf5.env[1].name | string | `"HF_XET_HIGH_PERFORMANCE"` |  |
+| runtimes.sparkArena.tf5.env[1].value | string | `"1"` |  |
+| runtimes.sparkArena.tf5.env[2].name | string | `"VLLM_CONFIG_ROOT"` |  |
+| runtimes.sparkArena.tf5.env[2].value | string | `"/tmp"` |  |
+| runtimes.sparkArena.tf5.resources.requests.cpu | string | `"2"` |  |
+| runtimes.sparkArena.tf5.resources.requests.memory | string | `"24Gi"` |  |
+| runtimes.sparkArena.tf5.resources.limits.cpu | string | `"8"` |  |
+| runtimes.sparkArena.tf5.resources.limits.memory | string | `"64Gi"` |  |
+| runtimes.sparkArena.tf5.startupProbe.httpGet.path | string | `"/health"` |  |
+| runtimes.sparkArena.tf5.startupProbe.httpGet.port | int | `8080` |  |
+| runtimes.sparkArena.tf5.startupProbe.initialDelaySeconds | int | `300` |  |
+| runtimes.sparkArena.tf5.startupProbe.periodSeconds | int | `30` |  |
+| runtimes.sparkArena.tf5.startupProbe.failureThreshold | int | `360` |  |
+| runtimes.sparkArena.tf5.shmSize | string | `"16Gi"` |  |
