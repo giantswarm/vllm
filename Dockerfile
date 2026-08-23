@@ -66,9 +66,21 @@ RUN mkdir -p /tmp/wheels && \
       || { echo "ERROR: vllm wheel not found after download"; exit 1; } && \
     ls -lh /tmp/wheels/
 
+# quack-kernels lags one CUTLASS DSL release behind vLLM (e.g. quack-kernels
+# 0.6.4 pins nvidia-cutlass-dsl==4.6.2 while the vLLM wheel wants
+# [cu13]==4.7.0), which makes the joint resolve unsatisfiable. Mirror upstream
+# spark-vllm-docker: override that transitive constraint with whatever CUTLASS
+# DSL pin the vLLM wheel itself declares, so the rolling wheel stays
+# self-consistent on every nightly.
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv pip install /tmp/wheels/*.whl && \
-    rm -rf /tmp/wheels
+    python3 -c "import glob,zipfile;\
+z=zipfile.ZipFile(glob.glob('/tmp/wheels/vllm-*.whl')[0]);\
+meta=[n for n in z.namelist() if n.endswith('.dist-info/METADATA')][0];\
+[print(l.split(':',1)[1].split(';')[0].strip()) for l in z.read(meta).decode().splitlines() if l.startswith('Requires-Dist: nvidia-cutlass-dsl')]" \
+      > /tmp/wheel-override.txt && \
+    echo "uv overrides:" && cat /tmp/wheel-override.txt && \
+    uv pip install --overrides /tmp/wheel-override.txt /tmp/wheels/*.whl && \
+    rm -rf /tmp/wheels /tmp/wheel-override.txt
 
 # Mistral Small 4 (119B) requires mistral-common >= 1.10.0 for reasoning_effort
 # support in the MistralCommonTokenizer, and transformers from git for the
