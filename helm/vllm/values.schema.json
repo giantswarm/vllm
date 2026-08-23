@@ -1,9 +1,19 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
+    "additionalProperties": false,
     "properties": {
+        "global": {
+            "type": [
+                "object",
+                "null"
+            ],
+            "description": "Global values shared between all subcharts",
+            "$comment": "Added automatically by 'helm schema' to allow this chart to be used as a Helm dependency, as the `additionalProperties` setting would otherwise collide with Helm's special 'global' values key."
+        },
         "image": {
             "type": "object",
+            "additionalProperties": false,
             "properties": {
                 "pullPolicy": {
                     "type": "string"
@@ -24,15 +34,18 @@
         },
         "runtimes": {
             "type": "object",
+            "additionalProperties": false,
             "properties": {
                 "sparkArena": {
                     "type": "object",
+                    "additionalProperties": false,
                     "properties": {
                         "enabled": {
                             "type": "boolean"
                         },
                         "eugr": {
                             "type": "object",
+                            "additionalProperties": false,
                             "properties": {
                                 "args": {
                                     "type": "array",
@@ -47,6 +60,7 @@
                                     "type": "array",
                                     "items": {
                                         "type": "object",
+                                        "additionalProperties": false,
                                         "properties": {
                                             "name": {
                                                 "type": "string"
@@ -62,9 +76,11 @@
                                 },
                                 "resources": {
                                     "type": "object",
+                                    "additionalProperties": false,
                                     "properties": {
                                         "limits": {
                                             "type": "object",
+                                            "additionalProperties": false,
                                             "properties": {
                                                 "cpu": {
                                                     "type": "string"
@@ -76,6 +92,7 @@
                                         },
                                         "requests": {
                                             "type": "object",
+                                            "additionalProperties": false,
                                             "properties": {
                                                 "cpu": {
                                                     "type": "string"
@@ -92,12 +109,14 @@
                                 },
                                 "startupProbe": {
                                     "type": "object",
+                                    "additionalProperties": false,
                                     "properties": {
                                         "failureThreshold": {
                                             "type": "integer"
                                         },
                                         "httpGet": {
                                             "type": "object",
+                                            "additionalProperties": false,
                                             "properties": {
                                                 "path": {
                                                     "type": "string"
@@ -122,6 +141,7 @@
                         },
                         "tf5": {
                             "type": "object",
+                            "additionalProperties": false,
                             "properties": {
                                 "args": {
                                     "type": "array",
@@ -136,6 +156,7 @@
                                     "type": "array",
                                     "items": {
                                         "type": "object",
+                                        "additionalProperties": false,
                                         "properties": {
                                             "name": {
                                                 "type": "string"
@@ -151,9 +172,11 @@
                                 },
                                 "resources": {
                                     "type": "object",
+                                    "additionalProperties": false,
                                     "properties": {
                                         "limits": {
                                             "type": "object",
+                                            "additionalProperties": false,
                                             "properties": {
                                                 "cpu": {
                                                     "type": "string"
@@ -165,6 +188,7 @@
                                         },
                                         "requests": {
                                             "type": "object",
+                                            "additionalProperties": false,
                                             "properties": {
                                                 "cpu": {
                                                     "type": "string"
@@ -181,12 +205,14 @@
                                 },
                                 "startupProbe": {
                                     "type": "object",
+                                    "additionalProperties": false,
                                     "properties": {
                                         "failureThreshold": {
                                             "type": "integer"
                                         },
                                         "httpGet": {
                                             "type": "object",
+                                            "additionalProperties": false,
                                             "properties": {
                                                 "path": {
                                                     "type": "string"
@@ -213,6 +239,7 @@
                 },
                 "vllm": {
                     "type": "object",
+                    "additionalProperties": false,
                     "properties": {
                         "args": {
                             "type": "array",
@@ -230,6 +257,7 @@
                             "type": "array",
                             "items": {
                                 "type": "object",
+                                "additionalProperties": false,
                                 "properties": {
                                     "name": {
                                         "type": "string"
@@ -251,9 +279,11 @@
                         },
                         "resources": {
                             "type": "object",
+                            "additionalProperties": false,
                             "properties": {
                                 "limits": {
                                     "type": "object",
+                                    "additionalProperties": false,
                                     "properties": {
                                         "cpu": {
                                             "type": "string"
@@ -265,6 +295,7 @@
                                 },
                                 "requests": {
                                     "type": "object",
+                                    "additionalProperties": false,
                                     "properties": {
                                         "cpu": {
                                             "type": "string"
@@ -281,12 +312,14 @@
                         },
                         "startupProbe": {
                             "type": "object",
+                            "additionalProperties": false,
                             "properties": {
                                 "failureThreshold": {
                                     "type": "integer"
                                 },
                                 "httpGet": {
                                     "type": "object",
+                                    "additionalProperties": false,
                                     "properties": {
                                         "path": {
                                             "type": "string"
