@@ -27,7 +27,7 @@ workflows:
         context: architect
         name: build-image-arm64
         platform: linux/arm64
-        resource_class: arm.large
+        resource_class: arm.medium
         push: false
         filters:
           branches:
@@ -46,7 +46,7 @@ workflows:
         context: architect
         name: build-image-release-arm64
         platform: linux/arm64
-        resource_class: arm.large
+        resource_class: arm.medium
         split-china-push: true
         filters:
           tags:
