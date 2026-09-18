@@ -26,7 +26,7 @@ The Dockerfile does **not** build vLLM from source. Instead it:
 
 1. Starts from `nvidia/cuda:13.2.0-devel-ubuntu24.04`
 2. Installs PyTorch nightly from the `cu130` index
-3. Downloads prebuilt vLLM + FlashInfer wheels from [eugr/spark-vllm-docker](https://github.com/eugr/spark-vllm-docker/releases) (compiled for CUDA 13.2 / Blackwell sm_121)
+3. Downloads the prebuilt vLLM wheel and the FlashInfer `flashinfer-python` and `flashinfer-cubin` wheels from [eugr/spark-vllm-docker](https://github.com/eugr/spark-vllm-docker/releases) (compiled for CUDA 13.2 / Blackwell sm_121). The FlashInfer JIT cache is not installed (its shim wheel requires a per-architecture provider the release does not carry); FlashInfer compiles the kernels it needs at first use under `FLASHINFER_WORKSPACE_BASE=/tmp`
 4. Installs Mistral runtime dependencies (`mistral-common >= 1.10.0`, `transformers` from git)
 
 The prebuilt wheels use rolling release tags (`prebuilt-vllm-current`, `prebuilt-flashinfer-current`) that are updated nightly with tested builds.

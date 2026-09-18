@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Image build: since FlashInfer 0.7 the JIT cache is a shim wheel (`flashinfer_jit_cache`) that requires a per-architecture provider wheel (`flashinfer-jit-cache-sm121a`); the upstream prebuilt release carries the shim without the provider and no index offers one for this build, so `uv pip install` of the release's wheels failed from 2026-09-17 on. The image now installs `flashinfer-python` and `flashinfer-cubin` and no JIT cache; FlashInfer compiles kernels at first use into `FLASHINFER_WORKSPACE_BASE=/tmp`. ([#68](https://github.com/giantswarm/vllm/issues/68))
+
 ## [0.4.0] - 2026-06-21
 
 ### Changed

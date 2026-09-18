@@ -45,14 +45,25 @@ RUN rm -rf /usr/local/lib/python3.12/dist-packages/triton && \
     fi && \
     rm -rf /tmp/ngc-triton /tmp/ngc-triton_helpers /tmp/ngc-triton_kernels
 
-# Download prebuilt wheels from eugr/spark-vllm-docker GitHub releases.
-# The release tags are rolling (updated nightly with tested builds).
+# Download the prebuilt wheels from the eugr/spark-vllm-docker GitHub releases.
+# The release tags are rolling (updated with tested builds). The image installs
+# the vLLM wheel and, from the FlashInfer release, flashinfer-python and
+# flashinfer-cubin. It does not install the FlashInfer JIT cache: since
+# FlashInfer 0.7 that cache is a shim wheel (flashinfer_jit_cache) requiring a
+# per-architecture provider wheel (flashinfer-jit-cache-sm121a) which the
+# release does not carry and no index offers for this build, and a provider
+# from another build would load precompiled kernels that do not match the
+# Python side. FlashInfer compiles the kernels it needs at first use into
+# FLASHINFER_WORKSPACE_BASE (set below), as it does without a cache.
+# See https://github.com/giantswarm/vllm/issues/68.
 RUN mkdir -p /tmp/wheels && \
-    for tag in prebuilt-vllm-current prebuilt-flashinfer-current; do \
+    for spec in "prebuilt-vllm-current:vllm-" \
+                "prebuilt-flashinfer-current:flashinfer_python- flashinfer_cubin-"; do \
+      tag="${spec%%:*}" && prefixes="${spec#*:}" && \
       curl -sf "https://api.github.com/repos/eugr/spark-vllm-docker/releases/tags/${tag}" \
         -o /tmp/release.json \
         || { echo "ERROR: failed to fetch ${tag} release metadata"; exit 1; } && \
-      python3 -c "import json;[print(a['browser_download_url']) for a in json.load(open('/tmp/release.json'))['assets'] if a['name'].endswith('.whl')]" \
+      python3 -c "import json,sys;pre=tuple(sys.argv[1].split());[print(a['browser_download_url']) for a in json.load(open('/tmp/release.json'))['assets'] if a['name'].endswith('.whl') and a['name'].startswith(pre)]" "${prefixes}" \
         > /tmp/urls.txt && \
       while IFS= read -r url; do \
         name=$(python3 -c "import urllib.parse,sys;print(urllib.parse.unquote(sys.argv[1].split('/')[-1]))" "${url}") && \
@@ -62,8 +73,10 @@ RUN mkdir -p /tmp/wheels && \
       done < /tmp/urls.txt; \
     done && \
     rm -f /tmp/release.json /tmp/urls.txt && \
-    ls /tmp/wheels/vllm-*.whl >/dev/null 2>&1 \
-      || { echo "ERROR: vllm wheel not found after download"; exit 1; } && \
+    for want in vllm- flashinfer_python- flashinfer_cubin-; do \
+      ls /tmp/wheels/"${want}"*.whl >/dev/null 2>&1 \
+        || { echo "ERROR: ${want}*.whl not found after download"; exit 1; }; \
+    done && \
     ls -lh /tmp/wheels/
 
 # quack-kernels lags one CUTLASS DSL release behind vLLM (e.g. quack-kernels
@@ -93,5 +106,10 @@ ENV TORCH_CUDA_ARCH_LIST="12.1a"
 ENV FLASHINFER_CUDA_ARCH_LIST="12.1a"
 ENV TRITON_PTXAS_PATH=/usr/local/cuda/bin/ptxas
 ENV VLLM_CONFIG_ROOT=/tmp
+# FlashInfer compiles kernels at first use (no precompiled JIT cache, see the
+# wheel download above) and writes them under
+# $FLASHINFER_WORKSPACE_BASE/.cache/flashinfer. /tmp is writable for root and
+# for a non-root uid on a read-only root filesystem alike, like VLLM_CONFIG_ROOT.
+ENV FLASHINFER_WORKSPACE_BASE=/tmp
 
 ENTRYPOINT ["python3", "-m", "vllm.entrypoints.openai.api_server"]
