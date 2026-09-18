@@ -7,8 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Mirror lane `mirror-b12x`: the newest `docker.io/eugr/spark-vllm-b12x:nightly-<YYYYMMDD>` (the B12X vLLM stack for ARM64 unified-memory Blackwell nodes) is copied digest-identically to `gsoci.azurecr.io/giantswarm/vllm-b12x:<YYYYMMDD>` every day. No floating alias: a consumer pins a date tag. ([#66](https://github.com/giantswarm/vllm/issues/66))
+- Every mirrored digest (`vllm-b12x:*`, `vllm:eugr-*`, `vllm:eugr-tf5-*`) is signed with cosign keyless under the mirror job's CircleCI OIDC identity through the architect orb's `cosign-sign-verify` command, so one Kyverno attestor (issuer `https://oidc.circleci.com`, the Giant Swarm pipeline-definition subject) admits mirrored and built images alike. A digest that already verifies is not signed again. The README documents the verify command.
+
+### Changed
+
+- The mirror jobs run on the orb's `architect` executor (cosign, jq) with skopeo installed at job start, one login serving skopeo and cosign, instead of on the skopeo image. Copies use `skopeo copy --all`, so a manifest list is mirrored whole, and every job asserts the mirrored digest equals the upstream one.
+
 ### Fixed
 
+- The daily mirror had not run since the switch to the dynamic-config setup workflow: CircleCI evaluates a legacy `triggers: schedule` in the setup config only, never in the merged `.circleci/custom.yml`. The cron is now a CircleCI Scheduled Pipeline on the project (README, "Mirror schedule") and the `mirror-nightly` workflow runs on every non-push pipeline of `main`, which also gives an on-demand run through one API call instead of an empty commit.
 - Image build: since FlashInfer 0.7 the JIT cache is a shim wheel (`flashinfer_jit_cache`) that requires a per-architecture provider wheel (`flashinfer-jit-cache-sm121a`); the upstream prebuilt release carries the shim without the provider and no index offers one for this build, so `uv pip install` of the release's wheels failed from 2026-09-17 on. The image now installs `flashinfer-python` and `flashinfer-cubin` and no JIT cache; FlashInfer compiles kernels at first use into `FLASHINFER_WORKSPACE_BASE=/tmp`. ([#68](https://github.com/giantswarm/vllm/issues/68))
 
 ## [0.4.0] - 2026-06-21
