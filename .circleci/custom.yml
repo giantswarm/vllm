@@ -8,12 +8,72 @@
 #     consumed via OCI by the BWI OCM bundle -- the generator's app-catalog
 #     chart pipeline does not fit, so the `app` flavour is dropped in
 #     team-bumblebee.yaml and the chart lives here.
-#   - the daily mirror-spark-arena cron that re-tags the upstream spark-arena
-#     DGX nightly images onto gsoci.
+#   - the daily mirror lanes that copy upstream vLLM nightlies for arm64
+#     Blackwell nodes onto gsoci, digest-identical, and sign every mirrored
+#     digest with cosign keyless under the job's CircleCI OIDC identity.
 version: 2.1
 
+# Both mirror lanes run on the orb's `architect` executor -- the image the orb
+# signs its own builds from (cosign, jq, bash) -- with skopeo added at job
+# start, so a mirrored digest is signed by exactly the identity and tooling a
+# built image is, and one Kyverno attestor admits both.
+#
+# Credentials: skopeo reads REGISTRY_AUTH_FILE, cosign reads
+# $DOCKER_CONFIG/config.json. Both point at the same file, so the single login
+# in mirror-prepare serves the copy and the signature push.
+commands:
+  mirror-prepare:
+    description: Install skopeo and log in to gsoci for skopeo and cosign alike.
+    steps:
+      - run:
+          name: Install skopeo
+          command: apk add --no-cache skopeo
+      - run:
+          name: Login to gsoci.azurecr.io
+          command: |
+            set -euo pipefail
+            mkdir -p "${DOCKER_CONFIG}"
+            skopeo login \
+              --username "${ACR_GSOCI_USERNAME}" \
+              --password "${ACR_GSOCI_PASSWORD}" \
+              gsoci.azurecr.io
+
+  sign-mirrored-digest:
+    description: >
+      Sign the digest a mirror step recorded in /tmp/.mirrored_ref with cosign
+      keyless (Fulcio certificate for this job's CircleCI OIDC identity, Rekor
+      entry) through the orb's cosign-sign-verify command -- the same command,
+      issuer and identity pattern the orb applies to the images it builds.
+      Idempotent: a digest that already verifies against that identity is left
+      alone, so a re-run adds no second signature.
+    steps:
+      - run:
+          name: Stage the mirrored digest for signing unless already signed
+          command: |
+            set -euo pipefail
+            REF=$(cat /tmp/.mirrored_ref)
+            : > /tmp/.cosign_refs
+            # Same issuer/identity pair the orb verifies with after signing.
+            # Only "unsigned" stages the digest; any other verify failure (registry,
+            # network, configuration) fails the step -- signing on top of it would
+            # hide the cause.
+            if OUT=$(cosign verify \
+                 --certificate-oidc-issuer-regexp '^https://oidc\.circleci\.com' \
+                 --certificate-identity-regexp '^https://circleci\.com/api/v2/projects/[a-f0-9-]+/pipeline-definitions/[a-f0-9-]+$' \
+                 "${REF}" 2>&1 >/dev/null); then
+              echo "${REF} already carries a Giant Swarm CircleCI signature; nothing to sign."
+            elif grep -Eq 'no signatures found|no matching signatures' <<<"${OUT}"; then
+              echo "${REF}" >> /tmp/.cosign_refs
+              echo "Staged for signing: ${REF}"
+            else
+              printf '%s\n' "${OUT}" >&2
+              echo "ERROR: cosign verify of ${REF} failed for a reason other than a missing signature" >&2
+              exit 1
+            fi
+      - architect/cosign-sign-verify
+
 jobs:
-  # Mirror spark-arena dgx-vllm-eugr-nightly[-tf5] to gsoci.
+  # Mirror spark-arena dgx-vllm-eugr-nightly[-tf5] to gsoci and sign it.
   #
   # Why: The DGX Spark "spark-arena" recipe-registry pulls
   # ghcr.io/spark-arena/dgx-vllm-eugr-nightly[-tf5]:latest. Those images bake in
@@ -28,11 +88,16 @@ jobs:
   #   eugr-<YYYYMMDDNN>           - non-tf5 variant, pinned to upstream date-rev
   #   eugr-tf5-<YYYYMMDDNN>       - tf5 variant, pinned to upstream date-rev
   #   eugr-latest, eugr-tf5-latest - moving alias, retagged each successful run
+  #
+  # The signature is attached to the digest, so the alias is covered by the
+  # signature of the pinned tag it points at.
   mirror-spark-arena:
-    docker:
-      - image: gsoci.azurecr.io/giantswarm/skopeo:v1.22.2
+    executor: architect/architect
     resource_class: small
     shell: /bin/bash
+    environment:
+      DOCKER_CONFIG: /tmp/.registry-auth
+      REGISTRY_AUTH_FILE: /tmp/.registry-auth/config.json
     parameters:
       source_image:
         description: Upstream image name under ghcr.io/spark-arena/.
@@ -45,37 +110,10 @@ jobs:
         type: string
         default: "latest"
     steps:
-      - run:
-          name: Install jq
-          command: |
-            set -euo pipefail
-            if command -v jq >/dev/null 2>&1; then
-              exit 0
-            fi
-            if command -v apk >/dev/null 2>&1; then
-              apk add --no-cache jq
-            elif command -v dnf >/dev/null 2>&1; then
-              dnf install -y --setopt=install_weak_deps=False jq
-            elif command -v microdnf >/dev/null 2>&1; then
-              microdnf install -y jq
-            elif command -v apt-get >/dev/null 2>&1; then
-              apt-get update
-              apt-get install -y --no-install-recommends jq
-            else
-              echo "no supported package manager found in base image" >&2
-              exit 1
-            fi
-      - run:
-          name: Login to gsoci.azurecr.io
-          command: |
-            set -euo pipefail
-            skopeo login \
-              --username "${ACR_GSOCI_USERNAME}" \
-              --password "${ACR_GSOCI_PASSWORD}" \
-              gsoci.azurecr.io
+      - mirror-prepare
       - run:
           name: Mirror << parameters.source_image >> -> gsoci/vllm:<< parameters.tag_prefix >>-*
-          no_output_timeout: 30m
+          no_output_timeout: 60m
           command: |
             set -euo pipefail
 
@@ -124,21 +162,98 @@ jobs:
                 echo "${DEST_REPO}:${PINNED_TAG} already at ${EXISTING}; skipping pinned copy."
               else
                 echo "${DEST_REPO}:${PINNED_TAG} exists with a different digest (${EXISTING}); overwriting."
-                skopeo copy --preserve-digests --retry-times=5 \
+                skopeo copy --all --preserve-digests --retry-times 5 \
                   "docker://${SOURCE_REPO}@${DIGEST}" \
                   "docker://${DEST_REPO}:${PINNED_TAG}"
               fi
             else
               echo "Mirroring ${SOURCE_REPO}@${DIGEST} -> ${DEST_REPO}:${PINNED_TAG}"
-              skopeo copy --preserve-digests --retry-times=5 \
+              skopeo copy --all --preserve-digests --retry-times 5 \
                 "docker://${SOURCE_REPO}@${DIGEST}" \
                 "docker://${DEST_REPO}:${PINNED_TAG}"
             fi
 
             echo "Pointing ${DEST_REPO}:${LATEST_TAG} at ${DEST_REPO}:${PINNED_TAG}"
-            skopeo copy --preserve-digests --retry-times=5 \
+            skopeo copy --all --preserve-digests --retry-times 5 \
               "docker://${DEST_REPO}:${PINNED_TAG}" \
               "docker://${DEST_REPO}:${LATEST_TAG}"
+
+            MIRRORED=$(skopeo inspect --no-tags --format '{{.Digest}}' \
+              "docker://${DEST_REPO}:${PINNED_TAG}")
+            if [ "${MIRRORED}" != "${DIGEST}" ]; then
+              echo "ERROR: ${DEST_REPO}:${PINNED_TAG} is at ${MIRRORED}, expected ${DIGEST}" >&2
+              exit 1
+            fi
+            echo "${DEST_REPO}@${DIGEST}" > /tmp/.mirrored_ref
+            echo "Mirrored ${DEST_REPO}:${PINNED_TAG} = ${DEST_REPO}@${DIGEST}"
+      - sign-mirrored-digest
+
+  # Mirror the newest docker.io/eugr/spark-vllm-b12x nightly to gsoci and sign it.
+  #
+  # Why: the B12X vLLM stack is the runtime that serves NVFP4 QAD models on
+  # arm64 unified-memory Blackwell nodes (GB10). Upstream publishes it on
+  # Docker Hub only, unsigned, as nightly-<YYYYMMDD>. An installation that
+  # pulls everything from gsoci under a signature policy needs the digest on
+  # gsoci with a Giant Swarm signature, and a preset must pin a date tag, not a
+  # floating nightly -- so no `latest` alias is produced here.
+  #
+  # Tag scheme on gsoci.azurecr.io/giantswarm/vllm-b12x:
+  #   <YYYYMMDD>  - the upstream nightly-<YYYYMMDD>, digest-identical (linux/arm64)
+  mirror-b12x:
+    executor: architect/architect
+    resource_class: small
+    shell: /bin/bash
+    environment:
+      DOCKER_CONFIG: /tmp/.registry-auth
+      REGISTRY_AUTH_FILE: /tmp/.registry-auth/config.json
+    steps:
+      - mirror-prepare
+      - run:
+          name: Mirror the newest eugr/spark-vllm-b12x nightly -> gsoci/vllm-b12x:<YYYYMMDD>
+          # The image is ~10 GiB compressed; skopeo reports progress throughout.
+          no_output_timeout: 60m
+          command: |
+            set -euo pipefail
+
+            SOURCE_REPO="docker.io/eugr/spark-vllm-b12x"
+            DEST_REPO="gsoci.azurecr.io/giantswarm/vllm-b12x"
+
+            # Newest nightly by the date in its tag. Upstream's floating tags
+            # are deliberately not consulted: the date tag is the contract.
+            DATE=$(skopeo list-tags "docker://${SOURCE_REPO}" \
+              | jq -r '.Tags[] | select(test("^nightly-[0-9]{8}$")) | ltrimstr("nightly-")' \
+              | sort -r | head -1)
+            if [ -z "${DATE}" ]; then
+              echo "ERROR: no nightly-YYYYMMDD tag on ${SOURCE_REPO}" >&2
+              exit 1
+            fi
+            SOURCE="${SOURCE_REPO}:nightly-${DATE}"
+            DEST="${DEST_REPO}:${DATE}"
+
+            DIGEST=$(skopeo inspect --no-tags --format '{{.Digest}}' "docker://${SOURCE}")
+            echo "Newest upstream nightly: ${SOURCE} @ ${DIGEST}"
+
+            if EXISTING=$(skopeo inspect --no-tags --format '{{.Digest}}' "docker://${DEST}" 2>/dev/null) \
+               && [ "${EXISTING}" = "${DIGEST}" ]; then
+              echo "${DEST} already at ${DIGEST}; nothing to copy."
+            else
+              if [ -n "${EXISTING:-}" ]; then
+                echo "${DEST} exists with a different digest (${EXISTING}); overwriting."
+              fi
+              echo "Mirroring ${SOURCE_REPO}@${DIGEST} -> ${DEST}"
+              skopeo copy --all --preserve-digests --retry-times 5 \
+                "docker://${SOURCE_REPO}@${DIGEST}" \
+                "docker://${DEST}"
+            fi
+
+            MIRRORED=$(skopeo inspect --no-tags --format '{{.Digest}}' "docker://${DEST}")
+            if [ "${MIRRORED}" != "${DIGEST}" ]; then
+              echo "ERROR: ${DEST} is at ${MIRRORED}, expected ${DIGEST}" >&2
+              exit 1
+            fi
+            echo "${DEST_REPO}@${DIGEST}" > /tmp/.mirrored_ref
+            echo "Mirrored ${DEST} = ${DEST_REPO}@${DIGEST}"
+      - sign-mirrored-digest
 
 workflows:
   build:
@@ -163,27 +278,37 @@ workflows:
               ignore:
                 - main
 
-  # Daily mirror of the spark-arena upstream nightly into gsoci. Both eugr
-  # and eugr-tf5 variants are mirrored in parallel; either failing leaves the
-  # other intact thanks to the per-job structure (no cross-leg dependency).
-  # Manual / on-demand runs: trigger via the CircleCI UI by re-running this
-  # workflow on main (or by pushing an empty commit if you need to override
-  # `source_tag`, since CircleCI doesn't expose typed inputs in the UI).
-  mirror-spark-arena-nightly:
-    triggers:
-      - schedule:
-          cron: "0 6 * * *"
-          filters:
-            branches:
-              only: main
+  # Daily mirror of the upstream nightlies into gsoci, each lane a job of its
+  # own so one failing leaves the others intact.
+  #
+  # The schedule is a CircleCI Scheduled Pipeline on this project (README,
+  # "Mirror schedule"): a legacy `triggers: schedule` is evaluated in the setup
+  # config only and never fires from this continuation file. The workflow runs
+  # on every pipeline that is not a git push -- the schedule, or an API-triggered
+  # pipeline on main for an on-demand run -- and never on pushes or tags.
+  mirror-nightly:
+    when:
+      not:
+        equal: [ webhook, << pipeline.trigger_source >> ]
     jobs:
       - mirror-spark-arena:
           context: architect
           name: mirror-eugr
           source_image: dgx-vllm-eugr-nightly
           tag_prefix: eugr
+          filters:
+            branches:
+              only: main
       - mirror-spark-arena:
           context: architect
           name: mirror-eugr-tf5
           source_image: dgx-vllm-eugr-nightly-tf5
           tag_prefix: eugr-tf5
+          filters:
+            branches:
+              only: main
+      - mirror-b12x:
+          context: architect
+          filters:
+            branches:
+              only: main
