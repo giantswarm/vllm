@@ -56,13 +56,15 @@ commands:
             # Same issuer/identity pair the orb verifies with after signing.
             # Only "unsigned" stages the digest; any other verify failure (registry,
             # network, configuration) fails the step -- signing on top of it would
-            # hide the cause.
+            # hide the cause. No bash here-strings anywhere in this file: CircleCI
+            # reads two consecutive less-than signs, comments included, as the
+            # start of a template placeholder.
             if OUT=$(cosign verify \
                  --certificate-oidc-issuer-regexp '^https://oidc\.circleci\.com' \
                  --certificate-identity-regexp '^https://circleci\.com/api/v2/projects/[a-f0-9-]+/pipeline-definitions/[a-f0-9-]+$' \
                  "${REF}" 2>&1 >/dev/null); then
               echo "${REF} already carries a Giant Swarm CircleCI signature; nothing to sign."
-            elif grep -Eq 'no signatures found|no matching signatures' <<<"${OUT}"; then
+            elif printf '%s' "${OUT}" | grep -Eq 'no signatures found|no matching signatures'; then
               echo "${REF}" >> /tmp/.cosign_refs
               echo "Staged for signing: ${REF}"
             else
