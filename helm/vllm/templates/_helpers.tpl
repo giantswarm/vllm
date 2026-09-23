@@ -23,10 +23,12 @@ repo as the bwi-kserve-vllm image.
 {{/*
 Common labels emitted on every ClusterServingRuntime. The `app.kubernetes.io/part-of`
 label is the BWI marker the bwi-clusterservingruntime ValidatingWebhookConfiguration
-selects on; the chart label keeps Helm release diagnostics readable.
+selects on; the chart label keeps Helm release diagnostics readable. Its value
+ends in `trimAll "-._"` because the 63-character cut of a long version can end in
+`.`, `_` (from `+`) or `--.`, which is not a valid label value.
 */}}
 {{- define "vllm.labels" -}}
-helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
+helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimAll "-._" }}
 app.kubernetes.io/name: {{ .Chart.Name }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
