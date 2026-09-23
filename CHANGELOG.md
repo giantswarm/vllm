@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Chart: the `helm.sh/chart` label was an invalid label value when the 63-character cut of a long chart version (a branch build, or an OCI install as `<tag>+<digest>`) ended in `.`, `_` or `--.`, and the API server refused the ClusterServingRuntimes. The value now ends in `trimAll "-._"`. ([#73](https://github.com/giantswarm/vllm/issues/73))
 - The daily mirror had not run since the switch to the dynamic-config setup workflow: CircleCI evaluates a legacy `triggers: schedule` in the setup config only, never in the merged `.circleci/custom.yml`. The cron is now a CircleCI Scheduled Pipeline on the project (README, "Mirror schedule") and the `mirror-nightly` workflow runs on every non-push pipeline of `main`, which also gives an on-demand run through one API call instead of an empty commit.
 - Image build: since FlashInfer 0.7 the JIT cache is a shim wheel (`flashinfer_jit_cache`) that requires a per-architecture provider wheel (`flashinfer-jit-cache-sm121a`); the upstream prebuilt release carries the shim without the provider and no index offers one for this build, so `uv pip install` of the release's wheels failed from 2026-09-17 on. The image now installs `flashinfer-python` and `flashinfer-cubin` and no JIT cache; FlashInfer compiles kernels at first use into `FLASHINFER_WORKSPACE_BASE=/tmp`. ([#68](https://github.com/giantswarm/vllm/issues/68))
 
