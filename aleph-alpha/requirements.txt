@@ -1,0 +1,3 @@
+# Supports vllm>=0.29.0,<0.30.0: bump together with the base in Dockerfile.
+aleph-alpha-inference==1.0.0 \
+    --hash=sha256:5a0ca118e67924f10c4f9c04dd64bef117007a17dd820233a8841b9cb8d6f211

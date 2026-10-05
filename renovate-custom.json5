@@ -1,0 +1,14 @@
+// Repo-specific Renovate rules, extended last by renovate.json5.
+{
+  packageRules: [
+    {
+      // aleph-alpha/Dockerfile: each aleph-alpha-inference release supports
+      // exactly one vLLM minor (1.0.0: vllm>=0.29.0,<0.30.0). The base stays on
+      // that minor until the plugin pin in aleph-alpha/requirements.txt moves
+      // with it.
+      matchFileNames: ['aleph-alpha/Dockerfile'],
+      matchPackageNames: ['vllm/vllm-openai'],
+      allowedVersions: '<0.30.0',
+    },
+  ],
+}
