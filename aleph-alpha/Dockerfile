@@ -11,7 +11,7 @@
 # Upstream recipe: https://github.com/Aleph-Alpha/aleph-alpha-inference/blob/main/Dockerfile
 
 # renovate: datasource=docker depName=vllm/vllm-openai
-FROM vllm/vllm-openai:v0.29.0@sha256:c2914767605584b6d8f45686b82de173ecc99e781897aa3d0a66dacd72c51ae1
+FROM vllm/vllm-openai:v0.31.0@sha256:c1c9f6fd5c109ba7f0546a59f5b2f15fb87f64c77782e90a27b648b42a8e67c3
 
 # --no-deps: the base image already has the vllm, torch and transformers the
 # plugin release supports, and pip must not replace them. The wheel is pinned
