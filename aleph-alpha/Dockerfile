@@ -11,16 +11,18 @@
 # Upstream recipe: https://github.com/Aleph-Alpha/aleph-alpha-inference/blob/main/Dockerfile
 
 # renovate: datasource=docker depName=vllm/vllm-openai
-FROM vllm/vllm-openai:v0.31.0@sha256:c1c9f6fd5c109ba7f0546a59f5b2f15fb87f64c77782e90a27b648b42a8e67c3
+FROM vllm/vllm-openai:v0.29.0@sha256:c2914767605584b6d8f45686b82de173ecc99e781897aa3d0a66dacd72c51ae1
 
 # --no-deps: the base image already has the vllm, torch and transformers the
 # plugin release supports, and pip must not replace them. The wheel is pinned
-# by hash.
+# by hash. The build fails when the base does not satisfy the plugin's
+# requirements (a base bumped past the one vLLM minor the plugin supports).
 COPY aleph-alpha/requirements.txt /tmp/aleph-alpha-requirements.txt
 RUN pip install --no-cache-dir --no-deps --require-hashes \
       -r /tmp/aleph-alpha-requirements.txt && \
     rm /tmp/aleph-alpha-requirements.txt && \
-    python3 -c "import aleph_alpha_inference"
+    python3 -c "import aleph_alpha_inference" && \
+    python3 -c "from importlib.metadata import requires, version; from packaging.requirements import Requirement; bad = [f'{r.name} {version(r.name)} (needs {r.specifier})' for r in map(Requirement, requires('aleph-alpha-inference')) if not r.marker and not r.specifier.contains(version(r.name), prereleases=True)]; assert not bad, 'base image does not satisfy aleph-alpha-inference: ' + ', '.join(bad)"
 
 # The base image's entrypoint stays `vllm serve`, so the image is used like
 # vllm/vllm-openai: <image> <model> [vllm serve options].

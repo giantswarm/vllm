@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `vllm-aleph-alpha` is built on `vllm/vllm-openai:v0.29.0` again: Renovate moved it to v0.31.0 (#84) before `renovate-custom.json5` was extended, and plugin 1.0.0 supports only vLLM 0.29. The build now fails when the base's vllm, torch or transformers do not satisfy the plugin's requirements. ([#82](https://github.com/giantswarm/vllm/issues/82))
+
 ### Added
 
 - Image `gsoci.azurecr.io/giantswarm/vllm-aleph-alpha` (linux/arm64): vLLM's own `vllm/vllm-openai:v0.29.0` with Aleph Alpha's `aleph-alpha-inference` 1.0.0 plugin (hash-pinned), which serves Kolibri-1 with its `kolibri1` reasoning and tool-call parsers. Built on a branch without a push and published on the release tag, beside the `vllm` image. Renovate keeps its base below vLLM 0.30, the one minor the plugin release supports. ([#82](https://github.com/giantswarm/vllm/issues/82))
