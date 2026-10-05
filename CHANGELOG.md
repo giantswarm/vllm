@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Image `gsoci.azurecr.io/giantswarm/vllm-aleph-alpha` (linux/arm64): vLLM's own `vllm/vllm-openai:v0.29.0` with Aleph Alpha's `aleph-alpha-inference` 1.0.0 plugin (hash-pinned), which serves Kolibri-1 with its `kolibri1` reasoning and tool-call parsers. Built on a branch without a push and published on the release tag, beside the `vllm` image. Renovate keeps its base below vLLM 0.30, the one minor the plugin release supports. ([#82](https://github.com/giantswarm/vllm/issues/82))
 - Mirror lane `mirror-b12x`: the newest `docker.io/eugr/spark-vllm-b12x:nightly-<YYYYMMDD>` (the B12X vLLM stack for ARM64 unified-memory Blackwell nodes) is copied digest-identically to `gsoci.azurecr.io/giantswarm/vllm-b12x:<YYYYMMDD>` every day. No floating alias: a consumer pins a date tag. ([#66](https://github.com/giantswarm/vllm/issues/66))
 - Every mirrored digest (`vllm-b12x:*`, `vllm:eugr-*`, `vllm:eugr-tf5-*`) is signed with cosign keyless under the mirror job's CircleCI OIDC identity through the architect orb's `cosign-sign-verify` command, so one Kyverno attestor (issuer `https://oidc.circleci.com`, the Giant Swarm pipeline-definition subject) admits mirrored and built images alike. A digest that already verifies is not signed again. The README documents the verify command.
 

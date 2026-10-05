@@ -307,6 +307,53 @@ workflows:
             branches:
               ignore: /.*/
 
+      # Image: vllm-aleph-alpha, vLLM's own server image with Aleph Alpha's
+      # vLLM plugin (aleph-alpha/Dockerfile), a line of its own because the
+      # plugin pins one vLLM minor. Built on a branch without a push, published
+      # on the release tag under the same version as the vllm image.
+      - architect/build-image:
+          context: architect
+          name: build-image-aleph-alpha-arm64
+          image: giantswarm/vllm-aleph-alpha
+          dockerfile: ./aleph-alpha/Dockerfile
+          platform: linux/arm64
+          resource_class: arm.medium
+          push: false
+          filters:
+            branches:
+              ignore:
+                - main
+
+      - architect/build-image:
+          context: architect
+          name: build-image-aleph-alpha-release-arm64
+          image: giantswarm/vllm-aleph-alpha
+          dockerfile: ./aleph-alpha/Dockerfile
+          platform: linux/arm64
+          resource_class: arm.medium
+          split-china-push: true
+          filters:
+            tags:
+              only: /^v.*/
+            branches:
+              ignore: /.*/
+
+      - architect/push-to-registries:
+          context: architect
+          name: push-aleph-alpha-to-registries-release
+          image: giantswarm/vllm-aleph-alpha
+          dockerfile: ./aleph-alpha/Dockerfile
+          merge-digests: true
+          platforms: "linux/arm64"
+          split-china-push: true
+          requires:
+            - build-image-aleph-alpha-release-arm64
+          filters:
+            tags:
+              only: /^v.*/
+            branches:
+              ignore: /.*/
+
   # Daily mirror of the upstream nightlies into gsoci, each lane a job of its
   # own so one failing leaves the others intact.
   #
