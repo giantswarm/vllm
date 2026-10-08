@@ -62,10 +62,10 @@ The Dockerfile does **not** build vLLM from source. Instead it:
 
 1. Starts from `nvidia/cuda:13.2.0-devel-ubuntu24.04`
 2. Installs PyTorch nightly from the `cu130` index
-3. Downloads the prebuilt vLLM wheel and the FlashInfer `flashinfer-python` and `flashinfer-cubin` wheels from [eugr/spark-vllm-docker](https://github.com/eugr/spark-vllm-docker/releases) (compiled for CUDA 13.2 / Blackwell sm_121). The FlashInfer JIT cache is not installed (its shim wheel requires a per-architecture provider the release does not carry); FlashInfer compiles the kernels it needs at first use under `FLASHINFER_WORKSPACE_BASE=/tmp`
+3. Downloads the prebuilt vLLM wheel from [eugr/spark-vllm-docker](https://github.com/eugr/spark-vllm-docker/releases) (compiled for CUDA 13.2 / Blackwell sm_121) and the FlashInfer `flashinfer-python` and `flashinfer-cubin` wheels from FlashInfer's own index (`https://flashinfer.ai/whl/`) at the version vLLM pins (`FLASHINFER_VERSION` in the `Dockerfile`). The FlashInfer JIT cache is not installed (its shim wheel requires a per-architecture provider no index offers for this build); FlashInfer compiles the kernels it needs at first use under `FLASHINFER_WORKSPACE_BASE=/tmp`
 4. Installs Mistral runtime dependencies (`mistral-common >= 1.10.0`, `transformers` from git)
 
-The prebuilt wheels use rolling release tags (`prebuilt-vllm-current`, `prebuilt-flashinfer-current`) that are updated nightly with tested builds.
+The prebuilt vLLM wheel uses the rolling release tag `prebuilt-vllm-current`, updated nightly with tested builds; FlashInfer is pinned and moves with vLLM's `requirements/cuda.txt`.
 
 ## Target hardware
 
