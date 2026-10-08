@@ -354,6 +354,54 @@ workflows:
             branches:
               ignore: /.*/
 
+      # Image: vllm-b12x-patched, the mirrored vllm-b12x nightly with the
+      # patch files of b12x/patches/ applied (b12x/Dockerfile), a line of its
+      # own so the mirror stays digest-identical to upstream. Built on a branch
+      # without a push, published on the release tag under the same version as
+      # the vllm image.
+      - architect/build-image:
+          context: architect
+          name: build-image-b12x-patched-arm64
+          image: giantswarm/vllm-b12x-patched
+          dockerfile: ./b12x/Dockerfile
+          platform: linux/arm64
+          resource_class: arm.medium
+          push: false
+          filters:
+            branches:
+              ignore:
+                - main
+
+      - architect/build-image:
+          context: architect
+          name: build-image-b12x-patched-release-arm64
+          image: giantswarm/vllm-b12x-patched
+          dockerfile: ./b12x/Dockerfile
+          platform: linux/arm64
+          resource_class: arm.medium
+          split-china-push: true
+          filters:
+            tags:
+              only: /^v.*/
+            branches:
+              ignore: /.*/
+
+      - architect/push-to-registries:
+          context: architect
+          name: push-b12x-patched-to-registries-release
+          image: giantswarm/vllm-b12x-patched
+          dockerfile: ./b12x/Dockerfile
+          merge-digests: true
+          platforms: "linux/arm64"
+          split-china-push: true
+          requires:
+            - build-image-b12x-patched-release-arm64
+          filters:
+            tags:
+              only: /^v.*/
+            branches:
+              ignore: /.*/
+
   # Daily mirror of the upstream nightlies into gsoci, each lane a job of its
   # own so one failing leaves the others intact.
   #

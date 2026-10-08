@@ -1,0 +1,20 @@
+Skip a token the Harmony parser rejects instead of failing the request.
+gpt-oss can end a message with <|return|> (200002) where the parser expects
+<|start|> (200006); the chat completion then fails with HTTP 500 (HarmonyError).
+Upstream: https://github.com/vllm-project/vllm/pull/59254 (process_chunk hunk;
+the fork has no count_reasoning_tokens yet). Drop once the nightly carries it.
+
+--- a/vllm/parser/harmony.py
++++ b/vllm/parser/harmony.py
+@@ -335,7 +335,10 @@
+         segments: list[Segment] = []
+         reasoning_token_count = 0
+         for token_id in token_ids:
+-            self._harmony_parser.process(token_id)
++            try:
++                self._harmony_parser.process(token_id)
++            except HarmonyError:
++                continue
+             channel = self._harmony_parser.current_channel
+             recipient = self._normalize_recipient(
+                 self._harmony_parser.current_recipient
