@@ -10,7 +10,7 @@
 # shows up here instead of being patched twice.
 
 # renovate: datasource=docker depName=gsoci.azurecr.io/giantswarm/vllm-b12x
-FROM gsoci.azurecr.io/giantswarm/vllm-b12x:20261011@sha256:d0ac7c5adbcd9a39fae50489457053e43ad1cd62cc18b7b461d2e372494e7890
+FROM gsoci.azurecr.io/giantswarm/vllm-b12x:20261012@sha256:779b2f61e74e03113297abd7be117c9a3c3c597dbf04f1bf41a18a4e2e9dffd4
 
 COPY b12x/patches/ /tmp/giantswarm-vllm-patches/
 
