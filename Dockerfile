@@ -9,7 +9,7 @@
 # FlashInfer wheels source: https://flashinfer.ai/whl/
 
 # renovate: datasource=docker depName=nvcr.io/nvidia/pytorch
-FROM nvcr.io/nvidia/pytorch:26.09-py3
+FROM nvcr.io/nvidia/pytorch:26.10-py3
 
 ENV UV_SYSTEM_PYTHON=1
 ENV UV_BREAK_SYSTEM_PACKAGES=1
