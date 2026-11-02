@@ -5,11 +5,21 @@
 # workflow in .circleci/config.yml merges into this file at pipeline runtime.
 version: 2.1
 orbs:
-  architect: giantswarm/architect@10.15.1
+  architect: giantswarm/architect@10.16.7
 
 workflows:
   build:
     jobs:
+    # Resolve the version once, at the start of the workflow, and persist it to
+    # the workspace (.pipeline_version). Every image and chart job requires
+    # this job and builds with that version instead of resolving its own, so a
+    # stable tag landing while the workflow runs (a promote) cannot give the
+    # image and the chart that references it different versions.
+    - architect/pin-version:
+        name: pin-version
+        filters:
+          tags:
+            only: /^v.*/
 
     # Native per-architecture image build (opt-in): one architect/build-image
     # job per platform, each on a resource class of that architecture, so no
@@ -29,6 +39,8 @@ workflows:
         platform: linux/arm64
         resource_class: arm.medium
         push: false
+        requires:
+        - pin-version
         filters:
           branches:
             ignore:
@@ -49,6 +61,8 @@ workflows:
         platform: linux/arm64
         resource_class: arm.medium
         split-china-push: true
+        requires:
+        - pin-version
         filters:
           tags:
             only: /^v.*/
@@ -62,6 +76,7 @@ workflows:
         platforms: "linux/arm64"
         split-china-push: true
         requires:
+        - pin-version
         - build-image-release-arm64
         filters:
           tags:
