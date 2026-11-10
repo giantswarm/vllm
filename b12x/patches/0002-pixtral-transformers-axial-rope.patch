@@ -5,7 +5,10 @@ old name unconditionally, so every Pixtral-based model (Mistral Small 4) fails a
 import on the nightly's transformers 5.18: ImportError: cannot import name
 'PixtralRotaryEmbedding'. The guarded import and position helper are upstream's
 pixtral.py hunk of https://github.com/vllm-project/vllm/pull/56108 (commit
-ec4a3a5370), unchanged. Drop once the nightly carries it.
+ec4a3a5370), unchanged. This is upstream provenance, not a submission to the
+B12X fork (local-inference-lab/vllm). Fork submission remains pending on
+https://github.com/giantswarm/vllm/issues/89; an authorized human must open it.
+Drop once the nightly carries it.
 
 --- a/vllm/model_executor/models/pixtral.py
 +++ b/vllm/model_executor/models/pixtral.py
