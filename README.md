@@ -29,6 +29,9 @@ The semver tags are produced by the `build` workflow on git tag pushes (see `Upd
 
 Every copy is `skopeo copy --all --preserve-digests`: the digest on gsoci is the upstream digest, and the job fails if it is not. A copy is skipped when the destination already holds the same digest, so re-runs are cheap. Mirrored tags are never deleted.
 
+See [Mirroring upstream ARM64 images](docs/mirroring.md) for platform selection,
+index preservation and the post-merge copy/sign verification procedure.
+
 ### Signatures
 
 Every mirrored digest is signed with cosign keyless under the mirror job's CircleCI OIDC identity (a Fulcio certificate, an entry in the public Rekor transparency log) through the architect orb's `cosign-sign-verify` command -- the same command, issuer and identity pattern the orb applies to the images it builds. An image built by a Giant Swarm CircleCI project and an image mirrored by one therefore verify with the same attestor, and one Kyverno `verifyImages` rule admits both. The signature is attached to the digest, so the `eugr-*-latest` aliases are covered by the signature of the pinned tag they point at. A digest that already verifies is not signed again on a re-run.
