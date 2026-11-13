@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Mirror jobs explicitly inspect linux/arm64 images on the amd64 executor, so ARM64-only upstream indexes can be resolved and verified. Copies still preserve the complete index and its digest.
+
 - `vllm-b12x-patched` carries the Pixtral import compatibility fix needed by Mistral Small 4 (`PixtralForConditionalGeneration`): the B12X nightly's `pixtral.py` imports `PixtralRotaryEmbedding`, which transformers 5.17 renamed to `PixtralVisionRotaryEmbedding` (axial RoPE), so the model failed at import. Patch `0002-pixtral-transformers-axial-rope.patch` carries upstream's version-guarded import ([vllm-project/vllm#56108](https://github.com/vllm-project/vllm/pull/56108)) until the nightly has it. Live GB10 chat completion and the agent-platform preset runtime pin remain pending release; image-build CI alone does not establish serving. ([#89](https://github.com/giantswarm/vllm/issues/89))
 - The `vllm` image builds again: upstream removed the rolling `prebuilt-flashinfer-current` release, so FlashInfer (`flashinfer-python`, `flashinfer-cubin`) now comes from FlashInfer's own index at the version vLLM pins (0.7.0.post1); the vLLM wheel still comes from `prebuilt-vllm-current`. ([#93](https://github.com/giantswarm/vllm/issues/93))
 - `vllm-aleph-alpha` is built on `vllm/vllm-openai:v0.29.0` again: Renovate moved it to v0.31.0 (#84) before `renovate-custom.json5` was extended, and plugin 1.0.0 supports only vLLM 0.29. The build now fails when the base's vllm, torch or transformers do not satisfy the plugin's requirements. ([#82](https://github.com/giantswarm/vllm/issues/82))

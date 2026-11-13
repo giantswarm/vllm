@@ -17,6 +17,9 @@ version: 2.1
 # signs its own builds from (cosign, jq, bash) -- with skopeo added at job
 # start, so a mirrored digest is signed by exactly the identity and tooling a
 # built image is, and one Kyverno attestor admits both.
+# Inspections explicitly select linux/arm64: the executor is amd64 but the
+# mirrored indexes can contain only arm64. Digest comparisons still use the
+# top-level index digest, and copies preserve the complete index with --all.
 #
 # Credentials: skopeo reads REGISTRY_AUTH_FILE, cosign reads
 # $DOCKER_CONFIG/config.json. Both point at the same file, so the single login
@@ -124,7 +127,7 @@ jobs:
             PREFIX="<< parameters.tag_prefix >>"
             INPUT_TAG="<< parameters.source_tag >>"
 
-            DIGEST=$(skopeo inspect --no-tags --format '{{.Digest}}' \
+            DIGEST=$(skopeo --override-os linux --override-arch arm64 inspect --no-tags --format '{{.Digest}}' \
               "docker://${SOURCE_REPO}:${INPUT_TAG}")
             echo "Source ${SOURCE_REPO}:${INPUT_TAG} digest: ${DIGEST}"
 
@@ -140,7 +143,7 @@ jobs:
                             | jq -r '.Tags[]' \
                             | grep -E '^[0-9]{10}$' \
                             | sort -ru | head -20); do
-                CDIG=$(skopeo inspect --no-tags --format '{{.Digest}}' \
+                CDIG=$(skopeo --override-os linux --override-arch arm64 inspect --no-tags --format '{{.Digest}}' \
                   "docker://${SOURCE_REPO}:${cand}" 2>/dev/null || echo "")
                 if [ "${CDIG}" = "${DIGEST}" ]; then
                   DATE_TAG="${cand}"
@@ -158,7 +161,7 @@ jobs:
             PINNED_TAG="${PREFIX}-${DATE_TAG}"
             LATEST_TAG="${PREFIX}-latest"
 
-            if EXISTING=$(skopeo inspect --no-tags --format '{{.Digest}}' \
+            if EXISTING=$(skopeo --override-os linux --override-arch arm64 inspect --no-tags --format '{{.Digest}}' \
                           "docker://${DEST_REPO}:${PINNED_TAG}" 2>/dev/null); then
               if [ "${EXISTING}" = "${DIGEST}" ]; then
                 echo "${DEST_REPO}:${PINNED_TAG} already at ${EXISTING}; skipping pinned copy."
@@ -180,7 +183,7 @@ jobs:
               "docker://${DEST_REPO}:${PINNED_TAG}" \
               "docker://${DEST_REPO}:${LATEST_TAG}"
 
-            MIRRORED=$(skopeo inspect --no-tags --format '{{.Digest}}' \
+            MIRRORED=$(skopeo --override-os linux --override-arch arm64 inspect --no-tags --format '{{.Digest}}' \
               "docker://${DEST_REPO}:${PINNED_TAG}")
             if [ "${MIRRORED}" != "${DIGEST}" ]; then
               echo "ERROR: ${DEST_REPO}:${PINNED_TAG} is at ${MIRRORED}, expected ${DIGEST}" >&2
@@ -232,10 +235,10 @@ jobs:
             SOURCE="${SOURCE_REPO}:nightly-${DATE}"
             DEST="${DEST_REPO}:${DATE}"
 
-            DIGEST=$(skopeo inspect --no-tags --format '{{.Digest}}' "docker://${SOURCE}")
+            DIGEST=$(skopeo --override-os linux --override-arch arm64 inspect --no-tags --format '{{.Digest}}' "docker://${SOURCE}")
             echo "Newest upstream nightly: ${SOURCE} @ ${DIGEST}"
 
-            if EXISTING=$(skopeo inspect --no-tags --format '{{.Digest}}' "docker://${DEST}" 2>/dev/null) \
+            if EXISTING=$(skopeo --override-os linux --override-arch arm64 inspect --no-tags --format '{{.Digest}}' "docker://${DEST}" 2>/dev/null) \
                && [ "${EXISTING}" = "${DIGEST}" ]; then
               echo "${DEST} already at ${DIGEST}; nothing to copy."
             else
@@ -248,7 +251,7 @@ jobs:
                 "docker://${DEST}"
             fi
 
-            MIRRORED=$(skopeo inspect --no-tags --format '{{.Digest}}' "docker://${DEST}")
+            MIRRORED=$(skopeo --override-os linux --override-arch arm64 inspect --no-tags --format '{{.Digest}}' "docker://${DEST}")
             if [ "${MIRRORED}" != "${DIGEST}" ]; then
               echo "ERROR: ${DEST} is at ${MIRRORED}, expected ${DIGEST}" >&2
               exit 1
